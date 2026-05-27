@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Performance Contact Center — Grupo Fiancar</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0a0a0f; --surface:#13131a; --surface2:#1c1c26;
+  --border:#252535; --border2:#2e2e42;
+  --text:#eeeef5; --text2:#9898b8; --muted:#55556a;
+  --red:#ff3a5c; --yellow:#f5c842; --green:#22d47a; --blue:#4d8eff; --accent:#7c5cfc;
+  --font:'Space Grotesk',sans-serif; --mono:'DM Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;}
+
+/* LOGIN */
+.login-overlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;}
+.login-box{background:var(--surface);border:1px solid var(--border2);padding:44px 40px;width:400px;display:flex;flex-direction:column;align-items:center;}
+.fiancar-logo{margin-bottom:24px;text-align:center;}
+.fiancar-logo svg{display:block;}
+.login-title{font-family:var(--font);font-size:16px;font-weight:600;color:var(--text);margin-bottom:4px;letter-spacing:0.5px;}
+.login-sub{font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:2.5px;text-transform:uppercase;margin-bottom:28px;}
+.login-field{width:100%;margin-bottom:12px;}
+.login-label{font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;color:var(--text2);margin-bottom:6px;display:block;}
+.login-input{width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:14px;padding:10px 14px;outline:none;transition:border-color 0.15s;}
+.login-input:focus{border-color:var(--accent);}
+.login-btn{width:100%;background:var(--accent);color:#fff;font-family:var(--font);font-size:13px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;padding:11px;border:none;cursor:pointer;margin-top:6px;transition:opacity 0.15s;}
+.login-btn:hover{opacity:0.85;}
+.login-error{color:var(--red);font-size:11px;text-align:center;margin-top:10px;min-height:14px;font-family:var(--mono);letter-spacing:0.5px;}
+.login-footer{font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:24px;letter-spacing:1.5px;text-transform:uppercase;}
+
+/* HEADER */
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 32px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;}
+.header-logo svg{display:block;}
+.header-divider{width:1px;height:32px;background:var(--border2);}
+.header-title{font-size:16px;font-weight:600;letter-spacing:0.3px;}
+.header-sub{font-size:11px;color:var(--text2);margin-top:2px;}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.badge{font-family:var(--mono);font-size:11px;padding:6px 12px;border:1px solid var(--border2);color:var(--text2);background:var(--surface2);}
+.badge-yellow{color:var(--yellow);border-color:rgba(245,200,66,0.3);background:rgba(245,200,66,0.06);}
+.badge-action{cursor:pointer;color:var(--accent);border-color:rgba(124,92,252,0.3);background:rgba(124,92,252,0.08);transition:all 0.15s;}
+.badge-action:hover{background:rgba(124,92,252,0.15);}
+
+/* TOOLBAR */
+.toolbar{padding:12px 32px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--border);background:var(--bg);}
+.toolbar-label{font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase;margin-right:4px;}
+.fbtn{font-family:var(--font);font-size:12px;font-weight:500;padding:6px 14px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;transition:all 0.15s;}
+.fbtn:hover{border-color:var(--accent);color:var(--text);}
+.fbtn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+
+.main{padding:24px 32px;max-width:1600px;margin:0 auto;}
+
+/* PANELS */
+.overview{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
+.ov{background:var(--surface);border:1px solid var(--border);border-top:2px solid var(--accent);padding:18px 16px;}
+.ov-label{font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;}
+.ov-val{font-size:34px;font-weight:700;line-height:1;}
+.ov-sub{font-size:11px;color:var(--muted);margin-top:5px;}
+
+.sec-title{font-family:var(--mono);font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text2);margin-bottom:12px;display:flex;align-items:center;gap:10px;}
+.sec-title::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* DATA MANAGER */
+.dm{background:var(--surface);border:1px solid var(--border);padding:20px;margin-bottom:24px;}
+.dm-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.dm-block{background:var(--surface2);border:1px solid var(--border);padding:16px;}
+.dm-h{font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text);margin-bottom:10px;}
+.dm-desc{font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.5;}
+.upload-area{border:2px dashed var(--border2);padding:24px;text-align:center;cursor:pointer;transition:all 0.15s;}
+.upload-area:hover{border-color:var(--accent);background:rgba(124,92,252,0.04);}
+.upload-area input{display:none;}
+.upload-icon{font-size:24px;color:var(--accent);margin-bottom:6px;}
+.upload-text{font-family:var(--mono);font-size:11px;color:var(--text2);letter-spacing:1px;text-transform:uppercase;}
+.upload-hint{font-size:11px;color:var(--muted);margin-top:6px;}
+
+table{width:100%;border-collapse:collapse;margin-bottom:24px;}
+thead tr{border-bottom:1px solid var(--border2);}
+th{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);padding:10px 12px;text-align:left;font-weight:400;}
+th.r{text-align:right;}
+td{padding:13px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(255,255,255,0.015);}
+tr.hl td{background:rgba(124,92,252,0.06);}
+
+.rank-b{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;font-family:var(--mono);font-size:13px;border:1px solid var(--border2);color:var(--text2);}
+.rank-b.g{border-color:#f5c842;color:#f5c842;background:rgba(245,200,66,0.08);}
+.rank-b.s{border-color:#aaaacc;color:#aaaacc;background:rgba(170,170,200,0.06);}
+.rank-b.b{border-color:#cd7f32;color:#cd7f32;background:rgba(205,127,50,0.06);}
+
+.aname{font-size:14px;font-weight:600;}
+.aext{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:2px;}
+
+.barcell{min-width:120px;}
+.btrack{height:4px;background:var(--border2);overflow:hidden;border-radius:2px;margin-top:5px;position:relative;}
+.bfill{height:100%;border-radius:2px;}
+.obj-line{position:absolute;top:0;bottom:0;left:90%;width:1px;background:var(--yellow);opacity:0.6;}
+.mval{font-family:var(--mono);font-size:14px;font-weight:500;}
+.msub{font-size:11px;color:var(--muted);margin-top:2px;}
+
+.score-wrap{display:flex;align-items:center;justify-content:flex-end;gap:10px;}
+.pills{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;}
+.pill{font-family:var(--mono);font-size:10px;padding:3px 7px;border:1px solid var(--border2);color:var(--text2);}
+.pill b{color:var(--text);}
+.pill.wpp-pill{cursor:pointer;transition:all 0.15s;}
+.pill.wpp-pill:hover{border-color:var(--accent);color:var(--text);}
+.pill.wpp-set{border-color:var(--accent);color:var(--accent);}
+.scircle{width:50px;height:50px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;border:2px solid;font-family:var(--mono);}
+.snum{font-size:15px;font-weight:500;line-height:1;}
+.sden{font-size:9px;color:var(--muted);}
+
+.dbtn{background:none;border:1px solid var(--border2);color:var(--text2);padding:5px 12px;cursor:pointer;font-family:var(--font);font-size:12px;transition:all 0.15s;}
+.dbtn:hover{border-color:var(--accent);color:var(--text);}
+
+/* DETAIL */
+.detail{display:none;background:var(--surface);border:1px solid var(--border2);padding:24px;margin-bottom:24px;}
+.detail.open{display:block;animation:sd 0.2s ease;}
+@keyframes sd{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+
+.dheader{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+.dname{font-size:22px;font-weight:700;}
+.dext{font-family:var(--mono);font-size:12px;color:var(--text2);margin-top:2px;}
+.closebtn{background:none;border:1px solid var(--border2);color:var(--text2);padding:6px 14px;cursor:pointer;font-family:var(--font);font-size:12px;}
+
+.dkpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px;}
+.dkpi{background:var(--surface2);border:1px solid var(--border);padding:14px;cursor:pointer;transition:border-color 0.15s;}
+.dkpi.editable:hover{border-color:var(--accent);}
+.dkpi-label{font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px;}
+.dkpi-val{font-size:26px;font-weight:700;line-height:1;}
+.dkpi-sub{font-size:11px;color:var(--muted);margin-top:3px;}
+.dkpi-edit{font-family:var(--mono);font-size:9px;color:var(--accent);margin-top:3px;letter-spacing:1px;text-transform:uppercase;}
+
+.dcharts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+.dpanel{background:var(--surface2);border:1px solid var(--border);padding:18px;}
+
+.gauge-wrap{display:flex;align-items:center;gap:20px;}
+.gauge{width:110px;height:110px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;border:3px solid;flex-shrink:0;}
+.gauge-num{font-family:var(--mono);font-size:28px;font-weight:700;line-height:1;}
+.gauge-max{font-size:12px;color:var(--muted);}
+.gauge-lbl{font-family:var(--mono);font-size:10px;margin-top:3px;}
+
+.sbars{flex:1;display:flex;flex-direction:column;gap:9px;}
+.sbar-row{display:flex;align-items:center;gap:8px;}
+.sbar-label{font-size:12px;color:var(--text2);width:140px;flex-shrink:0;}
+.sbar-track{flex:1;height:6px;background:var(--border2);overflow:hidden;}
+.sbar-fill{height:100%;}
+.sbar-val{font-family:var(--mono);font-size:12px;width:34px;text-align:right;}
+
+.note{background:rgba(124,92,252,0.07);border:1px solid rgba(124,92,252,0.2);padding:12px 14px;font-size:12px;color:var(--text2);line-height:1.6;margin-top:12px;}
+.note strong{color:var(--text);}
+
+.tmo-rows{display:flex;flex-direction:column;gap:7px;}
+.tmo-row{display:flex;align-items:center;gap:8px;}
+.tmo-name{font-size:12px;color:var(--text2);width:120px;flex-shrink:0;}
+.tmo-name.active{color:var(--text);font-weight:600;}
+.tmo-track{flex:1;height:18px;background:var(--border2);overflow:hidden;position:relative;}
+.tmo-fill{height:100%;}
+.tmo-objline{position:absolute;left:37.5%;top:0;bottom:0;width:1px;background:var(--yellow);opacity:0.7;}
+.tmo-val{font-family:var(--mono);font-size:12px;width:40px;text-align:right;}
+
+.wpp-section{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.wpp-panel{background:var(--surface2);border:1px solid var(--border);padding:18px;}
+.wpp-input-area{background:var(--bg);border:1px dashed var(--border2);padding:18px;text-align:center;margin-top:8px;}
+.wpp-lbl{font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;}
+.wpp-inp{width:100px;background:var(--surface);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:22px;text-align:center;padding:8px;outline:none;}
+.wpp-inp:focus{border-color:var(--accent);}
+.wpp-save{display:block;margin:10px auto 0;background:var(--accent);color:#fff;border:none;font-family:var(--font);font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;padding:7px 16px;cursor:pointer;}
+.wpp-save:hover{opacity:0.85;}
+.wpp-hint{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5;}
+.total-wrap{display:flex;align-items:center;gap:16px;padding:10px 0;}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border2);padding:28px;width:360px;}
+.modal-title{font-size:16px;font-weight:600;margin-bottom:8px;}
+.modal-sub{font-size:12px;color:var(--text2);margin-bottom:18px;}
+.modal-input{width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:18px;text-align:center;padding:12px;outline:none;}
+.modal-input:focus{border-color:var(--accent);}
+.modal-buttons{display:flex;gap:8px;margin-top:16px;}
+.modal-btn{flex:1;padding:10px;font-family:var(--font);font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text2);}
+.modal-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--accent);padding:12px 18px;font-size:13px;color:var(--text);z-index:300;animation:slideUp 0.3s ease;}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+
+@media(max-width:1100px){
+  .overview,.dkpis{grid-template-columns:repeat(2,1fr);}
+  .dm-grid,.dcharts,.wpp-section{grid-template-columns:1fr;}
+}
+@media(max-width:700px){
+  .main{padding:14px;}
+  .toolbar,.header{padding:12px 14px;}
+  .overview,.dkpis{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <div class="fiancar-logo">
+      <svg width="180" height="48" viewBox="0 0 180 48" xmlns="http://www.w3.org/2000/svg">
+        <text x="0" y="32" font-family="Space Grotesk" font-weight="700" font-size="28" fill="#eeeef5" letter-spacing="-1">grupo</text>
+        <text x="80" y="32" font-family="Space Grotesk" font-weight="700" font-size="28" fill="#7c5cfc" letter-spacing="-1">fiancar</text>
+        <line x1="0" y1="42" x2="180" y2="42" stroke="#7c5cfc" stroke-width="2"/>
+      </svg>
+    </div>
+    <div class="login-title">Performance Contact Center</div>
+    <div class="login-sub">Acceso restringido</div>
+    <div class="login-field">
+      <label class="login-label">Usuario</label>
+      <input class="login-input" id="loginUser" type="text" placeholder="usuario" autocomplete="username">
+    </div>
+    <div class="login-field">
+      <label class="login-label">Contraseña</label>
+      <input class="login-input" id="loginPass" type="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="login-btn" onclick="doLogin()">Ingresar</button>
+    <div class="login-error" id="loginError"></div>
+    <div class="login-footer">Grupo Fiancar — Uso interno</div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-logo">
+    <svg width="150" height="36" viewBox="0 0 150 36" xmlns="http://www.w3.org/2000/svg">
+      <text x="0" y="24" font-family="Space Grotesk" font-weight="700" font-size="22" fill="#eeeef5" letter-spacing="-0.5">grupo</text>
+      <text x="63" y="24" font-family="Space Grotesk" font-weight="700" font-size="22" fill="#7c5cfc" letter-spacing="-0.5">fiancar</text>
+      <line x1="0" y1="30" x2="150" y2="30" stroke="#7c5cfc" stroke-width="1.5"/>
+    </svg>
+  </div>
+  <div class="header-divider"></div>
+  <div>
+    <div class="header-title">Performance Contact Center</div>
+    <div class="header-sub">Métricas mensuales de desempeño · Agentes</div>
+  </div>
+  <div class="header-right">
+    <div class="badge" id="monthBadge">MAYO 2026</div>
+    <div class="badge badge-yellow">OBJ ATENCIÓN: 90%</div>
+    <div class="badge badge-action" onclick="toggleDataManager()">⚙ Gestionar datos</div>
+    <div class="badge badge-action" onclick="logout()">↪ Salir</div>
+  </div>
+</div>
+
+<div class="toolbar">
+  <span class="toolbar-label">Filtrar:</span>
+  <div id="filterBtns"></div>
+</div>
+
+<div class="main">
+
+  <!-- DATA MANAGER -->
+  <div class="dm" id="dataManager" style="display:none">
+    <div class="sec-title">Gestionar datos del mes</div>
+    <div class="dm-grid">
+      <div class="dm-block">
+        <div class="dm-h">📥 Importar desde CSV</div>
+        <div class="dm-desc">Subí el CSV "Porcentaje de llamadas atendidas por agente" descargado del sistema de telefonía. Se procesa y actualiza todos los datos automáticamente.</div>
+        <label class="upload-area">
+          <input type="file" accept=".csv" onchange="handleCSV(event)">
+          <div class="upload-icon">↑</div>
+          <div class="upload-text">Click o arrastrá el archivo CSV</div>
+          <div class="upload-hint">Formato: Porcentaje_de_llamadas_atendidas_por_agente.csv</div>
+        </label>
+      </div>
+      <div class="dm-block">
+        <div class="dm-h">✎ Editar mes / días hábiles</div>
+        <div class="dm-desc">Modifica los parámetros generales del mes en curso. Los puntajes se recalculan automáticamente.</div>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">
+          <div>
+            <div class="wpp-lbl">Mes mostrado</div>
+            <input class="login-input" id="monthInput" type="text" value="MAYO 2026" oninput="updateMonth()">
+          </div>
+          <div>
+            <div class="wpp-lbl">Días hábiles del mes</div>
+            <input class="login-input" id="daysInput" type="number" min="1" max="31" value="22" oninput="updateDays()">
+          </div>
+        </div>
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+          <button class="dbtn" onclick="exportData()" style="width:100%">↓ Exportar datos actuales (JSON)</button>
+          <button class="dbtn" onclick="resetData()" style="width:100%;margin-top:6px;border-color:rgba(255,58,92,0.3);color:var(--red)">↻ Restaurar datos originales</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OVERVIEW -->
+  <div class="overview">
+    <div class="ov" style="border-top-color:var(--blue)">
+      <div class="ov-label">Total llamadas</div>
+      <div class="ov-val" id="ov1">—</div>
+      <div class="ov-sub">Todas las colas</div>
+    </div>
+    <div class="ov" style="border-top-color:var(--green)">
+      <div class="ov-label">% Atendidas prom.</div>
+      <div class="ov-val" id="ov2">—</div>
+      <div class="ov-sub">Objetivo: 90%</div>
+    </div>
+    <div class="ov" style="border-top-color:var(--yellow)">
+      <div class="ov-label">TMO promedio</div>
+      <div class="ov-val" id="ov3">—</div>
+      <div class="ov-sub">Objetivo: 2:30</div>
+    </div>
+    <div class="ov" style="border-top-color:var(--accent)">
+      <div class="ov-label">Calls / día prom.</div>
+      <div class="ov-val" id="ov4">—</div>
+      <div class="ov-sub" id="ov4sub">Base 22 días hábiles</div>
+    </div>
+  </div>
+
+  <div class="sec-title">Ranking de desempeño</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:44px">#</th>
+        <th>Agente</th>
+        <th>Llamadas</th>
+        <th>% Atendidas</th>
+        <th>TMO</th>
+        <th>Calls/día</th>
+        <th class="r">Puntaje</th>
+        <th class="r">Ficha</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+
+  <!-- DETAIL -->
+  <div class="detail" id="detail">
+    <div class="dheader">
+      <div>
+        <div class="dname" id="dname"></div>
+        <div class="dext" id="dext"></div>
+      </div>
+      <button class="closebtn" onclick="closeDetail()">✕ Cerrar</button>
+    </div>
+    <div class="dkpis" id="dkpis"></div>
+    <div class="dcharts">
+      <div class="dpanel">
+        <div class="sec-title" style="font-size:10px;margin-bottom:14px">Puntaje por componente</div>
+        <div class="gauge-wrap" id="gaugeWrap"></div>
+        <div class="note" id="dnote"></div>
+      </div>
+      <div class="dpanel">
+        <div class="sec-title" style="font-size:10px;margin-bottom:14px">TMO vs equipo</div>
+        <div class="tmo-rows" id="tmoRows"></div>
+        <div style="margin-top:10px;font-size:11px;color:var(--muted);font-family:var(--mono)">▏línea amarilla = objetivo 2:30</div>
+      </div>
+    </div>
+    <div class="wpp-section" style="margin-top:12px">
+      <div class="wpp-panel">
+        <div class="sec-title" style="font-size:10px;margin-bottom:4px">Wpp & RRSS — Ingresar puntaje manual</div>
+        <div class="wpp-input-area">
+          <div class="wpp-lbl">Puntos (0 – 20)</div>
+          <input class="wpp-inp" type="number" min="0" max="20" placeholder="0" id="wppInp">
+          <button class="wpp-save" onclick="saveWpp()">Guardar</button>
+          <div class="wpp-hint">Se guarda en el navegador y persiste entre sesiones</div>
+        </div>
+      </div>
+      <div class="wpp-panel">
+        <div class="sec-title" style="font-size:10px;margin-bottom:4px">Puntaje total con Wpp</div>
+        <div class="total-wrap" id="totalWrap"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-title" id="editModalTitle">Editar valor</div>
+    <div class="modal-sub" id="editModalSub"></div>
+    <input class="modal-input" id="editModalInput" type="text">
+    <div class="modal-buttons">
+      <button class="modal-btn" onclick="closeEditModal()">Cancelar</button>
+      <button class="modal-btn primary" onclick="saveEditModal()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ DEFAULT DATA ============
+var DEFAULT_AGENTS = {
+  "Melani Barrero":  {ext:"7994",calls:754,tmo:125,pct:95.8},
+  "Sabrina Lapaz":   {ext:"7995",calls:707,tmo:170,pct:79.7},
+  "Natasha Piriz":   {ext:"7996",calls:642,tmo:156,pct:63.6},
+  "Isabel Crosa":    {ext:"7997",calls:606,tmo:109,pct:87.4},
+  "Damian Chmiel":   {ext:"8004",calls:584,tmo:153,pct:65.1},
+  "Alvaro Cuello":   {ext:"8003",calls:413,tmo:166,pct:73.5}
+};
+
+var DEFAULT_CONFIG = { month: "MAYO 2026", days: 22 };
+
+// ============ STATE ============
+var AGENTS = {};
+var WPP_SCORES = {};
+var CONFIG = {};
+var openAgent = null;
+var editTarget = null;
+
+// ============ STORAGE ============
+function saveStorage(){
+  try{
+    localStorage.setItem('fiancar_agents', JSON.stringify(AGENTS));
+    localStorage.setItem('fiancar_wpp', JSON.stringify(WPP_SCORES));
+    localStorage.setItem('fiancar_config', JSON.stringify(CONFIG));
+  }catch(e){}
+}
+
+function loadStorage(){
+  try{
+    var a = localStorage.getItem('fiancar_agents');
+    var w = localStorage.getItem('fiancar_wpp');
+    var c = localStorage.getItem('fiancar_config');
+    AGENTS = a ? JSON.parse(a) : JSON.parse(JSON.stringify(DEFAULT_AGENTS));
+    WPP_SCORES = w ? JSON.parse(w) : {};
+    CONFIG = c ? JSON.parse(c) : JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+  }catch(e){
+    AGENTS = JSON.parse(JSON.stringify(DEFAULT_AGENTS));
+    WPP_SCORES = {};
+    CONFIG = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+  }
+}
+
+// ============ SCORING ============
+function computeScores(){
+  // Sort by calls desc, assign rank
+  var entries = Object.entries(AGENTS).sort(function(a,b){return b[1].calls - a[1].calls;});
+  entries.forEach(function(pair, i){
+    var d = pair[1];
+    d.rank = i + 1;
+    d.cpd = +(d.calls / CONFIG.days).toFixed(1);
+    // Score llamadas (30%)
+    var rankScores = {1:30, 2:22.5, 3:15, 4:7.5};
+    d.sc = rankScores[d.rank] || 0;
+    // Score TMO (25%): 25 * (150 / tmo), cap at 25
+    d.st = d.tmo > 0 ? Math.min(+(25 * 150 / d.tmo).toFixed(1), 25) : 0;
+    // Score % atendidas (25%): 25 if >= 90, linear below
+    d.sp = d.pct >= 90 ? 25.0 : (d.pct <= 0 ? 0 : +(25 * d.pct / 90).toFixed(1));
+    // TMO display
+    var s = Math.round(d.tmo);
+    d.tmod = Math.floor(s/60) + ':' + (s%60+'').padStart(2,'0');
+    // Total (without Wpp)
+    d.total = +(d.sc + d.st + d.sp).toFixed(1);
+  });
+}
+
+// ============ UTILS ============
+function sc(s){ return s>=80?'var(--green)':s>=66?'var(--yellow)':'var(--red)'; }
+function sl(s){ return s>=80?'VERDE':s>=66?'AMARILLO':'ROJO'; }
+function pc(p){ return p>=90?'var(--green)':p>=75?'var(--yellow)':'var(--red)'; }
+function tc(t){ return t<=150?'var(--green)':t<=180?'var(--yellow)':'var(--red)'; }
+function rb(r){ return r===1?'g':r===2?'s':r===3?'b':''; }
+function getTotal(name){
+  var d = AGENTS[name];
+  var wpp = WPP_SCORES[name] || 0;
+  return Math.min(d.total + wpp, 100);
+}
+
+// ============ LOGIN ============
+function doLogin(){
+  var u = document.getElementById('loginUser').value.trim().toLowerCase();
+  var p = document.getElementById('loginPass').value.trim();
+  if(u === 'fiancar' && p === 'fiancar2026'){
+    localStorage.setItem('fiancar_auth', 'ok');
+    document.getElementById('loginOverlay').style.display = 'none';
+    init();
+  } else {
+    document.getElementById('loginError').textContent = 'Usuario o contraseña incorrectos';
+    document.getElementById('loginPass').value = '';
+    document.getElementById('loginPass').focus();
+  }
+}
+
+function logout(){
+  localStorage.removeItem('fiancar_auth');
+  location.reload();
+}
+
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Enter'){
+    if(document.getElementById('loginOverlay').style.display !== 'none'){ doLogin(); }
+    else if(document.getElementById('editModal').classList.contains('open')){ saveEditModal(); }
+  }
+  if(e.key === 'Escape'){
+    if(document.getElementById('editModal').classList.contains('open')) closeEditModal();
+  }
+});
+
+// ============ UI BUILDERS ============
+function buildFilters(){
+  var html = '<button class="fbtn active" data-agent="todos" onclick="filter(\'todos\',this)">Todos</button>';
+  Object.keys(AGENTS).forEach(function(n){
+    html += '<button class="fbtn" data-agent="'+n+'" onclick="filter(\''+n+'\',this)">'+n+'</button>';
+  });
+  document.getElementById('filterBtns').innerHTML = html;
+}
+
+function buildOv(agents){
+  var totalC=0, wPct=0, wTmo=0;
+  agents.forEach(function(n){
+    var d = AGENTS[n];
+    totalC += d.calls; wPct += d.pct * d.calls; wTmo += d.tmo * d.calls;
+  });
+  var avgPct = totalC > 0 ? wPct/totalC : 0;
+  var avgTmo = totalC > 0 ? Math.round(wTmo/totalC) : 0;
+  var avgCpd = (totalC / CONFIG.days / agents.length).toFixed(1);
+  document.getElementById('ov1').textContent = totalC.toLocaleString('es-UY');
+  document.getElementById('ov2').innerHTML = '<span style="color:'+pc(avgPct)+'">'+avgPct.toFixed(1)+'%</span>';
+  document.getElementById('ov3').innerHTML = '<span style="color:'+tc(avgTmo)+'">'+Math.floor(avgTmo/60)+':'+(avgTmo%60+'').padStart(2,'0')+'</span>';
+  document.getElementById('ov4').textContent = avgCpd;
+  document.getElementById('ov4sub').textContent = 'Base ' + CONFIG.days + ' días hábiles';
+}
+
+function buildTable(agents){
+  if(agents.length === 0){
+    document.getElementById('tbody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:30px">Sin datos</td></tr>';
+    return;
+  }
+  var maxC = Math.max.apply(null, agents.map(function(n){return AGENTS[n].calls;}));
+  var tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+  // sort by rank
+  agents.sort(function(a,b){return AGENTS[a].rank - AGENTS[b].rank;});
+  agents.forEach(function(name){
+    var d = AGENTS[name];
+    var tr = document.createElement('tr');
+    tr.id = 'row_' + name.replace(/[^a-z0-9]/gi,'_');
+    if(openAgent === name) tr.className = 'hl';
+    var wpp = WPP_SCORES[name];
+    var hasWpp = (wpp !== undefined && wpp > 0);
+    var totalWithWpp = getTotal(name);
+
+    var pctBar = '<div class="btrack"><div class="bfill" style="width:'+Math.min(d.pct,100)+'%;background:'+pc(d.pct)+'"></div><div class="obj-line"></div></div>';
+    var cBar = '<div class="btrack"><div class="bfill" style="width:'+(d.calls/maxC*100).toFixed(1)+'%;background:var(--blue)"></div></div>';
+    var tBar = '<div class="btrack"><div class="bfill" style="width:'+Math.min(d.tmo/300*100,100).toFixed(1)+'%;background:'+tc(d.tmo)+'"></div></div>';
+
+    tr.innerHTML =
+      '<td><span class="rank-b '+rb(d.rank)+'">'+d.rank+'</span></td>' +
+      '<td><div class="aname">'+name+'</div><div class="aext">ext. '+d.ext+'</div></td>' +
+      '<td class="barcell"><div class="mval">'+d.calls.toLocaleString('es-UY')+'</div>'+cBar+'</td>' +
+      '<td class="barcell"><div class="mval" style="color:'+pc(d.pct)+'">'+d.pct.toFixed(1)+'%</div>'+pctBar+'</td>' +
+      '<td class="barcell"><div class="mval" style="color:'+tc(d.tmo)+'">'+d.tmod+'</div>'+tBar+'</td>' +
+      '<td><div class="mval">'+d.cpd+'</div><div class="msub">por día</div></td>' +
+      '<td style="text-align:right">' +
+        '<div class="score-wrap">' +
+          '<div class="pills">' +
+            '<div class="pill">Calls <b>'+d.sc+'</b></div>' +
+            '<div class="pill">TMO <b>'+d.st+'</b></div>' +
+            '<div class="pill">Atend. <b>'+d.sp+'</b></div>' +
+            '<div class="pill wpp-pill '+(hasWpp?'wpp-set':'')+'" onclick="quickEditWpp(\''+name+'\')">Wpp <b>'+(hasWpp?'+'+wpp:'+?')+'</b></div>' +
+          '</div>' +
+          '<div class="scircle" style="border-color:'+sc(totalWithWpp)+';color:'+sc(totalWithWpp)+'">' +
+            '<div class="snum">'+totalWithWpp.toFixed(0)+'</div><div class="sden">/100</div>' +
+          '</div>' +
+        '</div>' +
+      '</td>' +
+      '<td style="text-align:right"><button class="dbtn" onclick="toggleDetail(\''+name+'\')">Ver ficha ↗</button></td>';
+    tbody.appendChild(tr);
+  });
+}
+
+function toggleDetail(name){
+  if(openAgent === name){ closeDetail(); return; }
+  openAgent = name;
+  var row = document.getElementById('row_' + name.replace(/[^a-z0-9]/gi,'_'));
+  if(!row) return;
+  row.after(document.getElementById('detail'));
+  buildDetailContent(name);
+  document.getElementById('detail').className = 'detail open';
+  document.querySelectorAll('tr').forEach(function(r){r.classList.remove('hl');});
+  row.className = 'hl';
+  document.getElementById('detail').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function closeDetail(){
+  openAgent = null;
+  document.getElementById('detail').className = 'detail';
+  document.querySelectorAll('tr.hl').forEach(function(r){r.classList.remove('hl');});
+}
+
+function buildDetailContent(name){
+  var d = AGENTS[name];
+  document.getElementById('dname').textContent = name;
+  document.getElementById('dext').textContent = 'Extensión ' + d.ext + ' · Ranking #' + d.rank + ' del equipo';
+
+  var kpis = [
+    {key:'calls', label:'Llamadas totales', val:d.calls.toLocaleString('es-UY'), sub:'mes (click para editar)', color:'var(--blue)', editable:true},
+    {key:null,    label:'Calls por día',    val:d.cpd,                          sub:'base '+CONFIG.days+' días',  color:'var(--accent)'},
+    {key:'pct',   label:'% Atendidas',      val:d.pct.toFixed(1)+'%',           sub:'obj: 90% (click para editar)', color:pc(d.pct), editable:true},
+    {key:'tmo',   label:'TMO',              val:d.tmod,                         sub:'obj: 2:30 (click para editar)',color:tc(d.tmo), editable:true},
+    {key:null,    label:'Puesto ranking',   val:'#'+d.rank,                     sub:'por cantidad',                 color:'var(--yellow)'}
+  ];
+  document.getElementById('dkpis').innerHTML = kpis.map(function(k){
+    var cls = k.editable ? 'dkpi editable' : 'dkpi';
+    var onclick = k.editable ? ' onclick="editKpi(\''+name+'\',\''+k.key+'\')"' : '';
+    var editTag = k.editable ? '<div class="dkpi-edit">✎ editar</div>' : '';
+    return '<div class="'+cls+'"'+onclick+'>'+
+      '<div class="dkpi-label">'+k.label+'</div>'+
+      '<div class="dkpi-val" style="color:'+k.color+'">'+k.val+'</div>'+
+      '<div class="dkpi-sub">'+k.sub+'</div>'+
+      editTag +
+      '</div>';
+  }).join('');
+
+  var totalWithWpp = getTotal(name);
+  var color = sc(totalWithWpp);
+  var wpp = WPP_SCORES[name] || 0;
+
+  document.getElementById('gaugeWrap').innerHTML =
+    '<div class="gauge" style="border-color:'+color+';color:'+color+'">'+
+      '<div class="gauge-num">'+totalWithWpp.toFixed(1)+'</div>'+
+      '<div class="gauge-max">/100</div>'+
+      '<div class="gauge-lbl" style="color:'+color+'">'+sl(totalWithWpp)+'</div>'+
+    '</div>'+
+    '<div class="sbars">'+
+      sbarRow('Llamadas (30%)', d.sc, 30, 'var(--blue)')+
+      sbarRow('% Atendidas (25%)', d.sp, 25, pc(d.pct))+
+      sbarRow('TMO (25%)', d.st, 25, tc(d.tmo))+
+      sbarRow('Wpp & RRSS (20%)', wpp, 20, 'var(--accent)')+
+    '</div>';
+
+  document.getElementById('dnote').innerHTML = generateNote(name, d);
+
+  var allByTmo = Object.entries(AGENTS).sort(function(a,b){return a[1].tmo - b[1].tmo;});
+  var maxTmo = Math.max.apply(null, Object.values(AGENTS).map(function(a){return a.tmo;}));
+  document.getElementById('tmoRows').innerHTML = allByTmo.map(function(pair){
+    var n = pair[0], a = pair[1];
+    var isMe = (n === name);
+    return '<div class="tmo-row">'+
+      '<div class="tmo-name'+(isMe?' active':'')+'">'+n.split(' ')[0]+'</div>'+
+      '<div class="tmo-track">'+
+        '<div class="tmo-fill" style="width:'+(a.tmo/maxTmo*100).toFixed(1)+'%;background:'+(isMe?tc(a.tmo):'var(--border2)')+'"></div>'+
+        '<div class="tmo-objline"></div>'+
+      '</div>'+
+      '<div class="tmo-val" style="color:'+tc(a.tmo)+'">'+a.tmod+'</div>'+
+    '</div>';
+  }).join('');
+
+  document.getElementById('wppInp').value = (WPP_SCORES[name] !== undefined ? WPP_SCORES[name] : '');
+  renderTotal(name);
+}
+
+function sbarRow(label, val, max, color){
+  var pct = max > 0 ? (val/max*100).toFixed(0) : 0;
+  return '<div class="sbar-row">'+
+    '<div class="sbar-label">'+label+'</div>'+
+    '<div class="sbar-track"><div class="sbar-fill" style="width:'+pct+'%;background:'+color+'"></div></div>'+
+    '<div class="sbar-val">'+val+'</div>'+
+  '</div>';
+}
+
+function generateNote(name, d){
+  var issues = [];
+  var strengths = [];
+  if(d.pct >= 90) strengths.push('% de atención dentro del objetivo');
+  else if(d.pct >= 75) issues.push('% de atención bajo objetivo (90%)');
+  else issues.push('% de atención muy por debajo del objetivo (90%)');
+
+  if(d.tmo <= 150) strengths.push('TMO óptimo');
+  else if(d.tmo <= 180) issues.push('TMO ligeramente sobre objetivo (2:30)');
+  else issues.push('TMO muy elevado');
+
+  if(d.rank <= 2) strengths.push('top del equipo en volumen de llamadas');
+  else if(d.rank >= 5) issues.push('volumen de llamadas bajo');
+
+  var txt = '';
+  if(strengths.length) txt += '<strong>Fortalezas:</strong> ' + strengths.join(', ') + '.';
+  if(issues.length) txt += (txt?' <br>':'') + '<strong>A mejorar:</strong> ' + issues.join(', ') + '.';
+  return txt || 'Sin observaciones automáticas para este agente.';
+}
+
+function saveWpp(){
+  if(!openAgent) return;
+  var val = Math.min(Math.max(parseFloat(document.getElementById('wppInp').value)||0, 0), 20);
+  WPP_SCORES[openAgent] = val;
+  saveStorage();
+  renderTotal(openAgent);
+  buildTable(getCurrentAgents());
+  // re-highlight row
+  var row = document.getElementById('row_' + openAgent.replace(/[^a-z0-9]/gi,'_'));
+  if(row){ row.after(document.getElementById('detail')); row.className='hl'; }
+  toast('Puntaje Wpp guardado para ' + openAgent);
+}
+
+function quickEditWpp(name){
+  editTarget = {agent:name, field:'wpp'};
+  document.getElementById('editModalTitle').textContent = 'Wpp & RRSS — ' + name;
+  document.getElementById('editModalSub').textContent = 'Puntaje del 0 al 20 (peso 20% del total)';
+  document.getElementById('editModalInput').type = 'number';
+  document.getElementById('editModalInput').value = WPP_SCORES[name] !== undefined ? WPP_SCORES[name] : '';
+  document.getElementById('editModal').classList.add('open');
+  document.getElementById('editModalInput').focus();
+}
+
+function editKpi(name, field){
+  editTarget = {agent:name, field:field};
+  var labels = {calls:'Llamadas totales', pct:'% Atendidas', tmo:'TMO (en formato m:ss o segundos)'};
+  document.getElementById('editModalTitle').textContent = labels[field] + ' — ' + name;
+  document.getElementById('editModalSub').textContent = field==='tmo' ? 'Ingresá m:ss (ej: 2:30) o segundos (ej: 150)' : 'Ingresá el nuevo valor';
+  document.getElementById('editModalInput').type = field==='tmo' ? 'text' : 'number';
+  var d = AGENTS[name];
+  document.getElementById('editModalInput').value = field==='tmo' ? d.tmod : d[field];
+  document.getElementById('editModal').classList.add('open');
+  document.getElementById('editModalInput').focus();
+  document.getElementById('editModalInput').select();
+}
+
+function saveEditModal(){
+  if(!editTarget) return;
+  var raw = document.getElementById('editModalInput').value.trim();
+  if(!raw){ closeEditModal(); return; }
+  var d = AGENTS[editTarget.agent];
+
+  if(editTarget.field === 'wpp'){
+    WPP_SCORES[editTarget.agent] = Math.min(Math.max(parseFloat(raw)||0, 0), 20);
+  } else if(editTarget.field === 'tmo'){
+    var sec;
+    if(raw.indexOf(':') > -1){
+      var p = raw.split(':');
+      sec = parseInt(p[0])*60 + parseInt(p[1]);
+    } else {
+      sec = parseFloat(raw);
+    }
+    if(!isNaN(sec) && sec > 0) d.tmo = sec;
+  } else if(editTarget.field === 'pct'){
+    d.pct = Math.min(Math.max(parseFloat(raw)||0, 0), 100);
+  } else if(editTarget.field === 'calls'){
+    d.calls = Math.max(parseInt(raw)||0, 0);
+  }
+  computeScores();
+  saveStorage();
+  closeEditModal();
+  rerenderAll();
+  if(openAgent) buildDetailContent(openAgent);
+  toast('Valor actualizado');
+}
+
+function closeEditModal(){
+  document.getElementById('editModal').classList.remove('open');
+  editTarget = null;
+}
+
+function renderTotal(name){
+  var d = AGENTS[name];
+  var wpp = WPP_SCORES[name] || 0;
+  var total = Math.min(d.total + wpp, 100);
+  var color = sc(total);
+  document.getElementById('totalWrap').innerHTML =
+    '<div class="gauge" style="width:90px;height:90px;border-color:'+color+';color:'+color+'">'+
+      '<div class="gauge-num" style="font-size:26px">'+total.toFixed(1)+'</div>'+
+      '<div class="gauge-max">/100</div>'+
+    '</div>'+
+    '<div>'+
+      '<div style="font-size:12px;color:var(--text2)">Score base: <span style="font-family:var(--mono);color:var(--text)">'+d.total+'/80</span></div>'+
+      '<div style="font-size:12px;color:var(--text2);margin-top:4px">Wpp & RRSS: <span style="font-family:var(--mono);color:var(--accent)">+'+wpp+'/20</span></div>'+
+      '<div style="margin-top:8px;font-family:var(--mono);font-size:11px;padding:4px 10px;border:1px solid '+color+';color:'+color+';display:inline-block">'+sl(total)+'</div>'+
+    '</div>';
+}
+
+function getCurrentAgents(){
+  var activeBtn = document.querySelector('.fbtn.active');
+  if(!activeBtn) return Object.keys(AGENTS);
+  var a = activeBtn.dataset.agent;
+  return a === 'todos' ? Object.keys(AGENTS) : [a];
+}
+
+function filter(agent, btn){
+  document.querySelectorAll('.fbtn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  closeDetail();
+  var agents = agent === 'todos' ? Object.keys(AGENTS) : [agent];
+  buildOv(agents);
+  buildTable(agents);
+}
+
+function rerenderAll(){
+  buildFilters();
+  buildOv(getCurrentAgents());
+  buildTable(getCurrentAgents());
+  document.getElementById('monthBadge').textContent = CONFIG.month;
+}
+
+// ============ DATA MANAGER ============
+function toggleDataManager(){
+  var dm = document.getElementById('dataManager');
+  dm.style.display = (dm.style.display === 'none' || !dm.style.display) ? 'block' : 'none';
+  if(dm.style.display === 'block'){
+    document.getElementById('monthInput').value = CONFIG.month;
+    document.getElementById('daysInput').value = CONFIG.days;
+  }
+}
+
+function updateMonth(){
+  CONFIG.month = document.getElementById('monthInput').value;
+  document.getElementById('monthBadge').textContent = CONFIG.month;
+  saveStorage();
+}
+
+function updateDays(){
+  var v = parseInt(document.getElementById('daysInput').value);
+  if(v > 0 && v <= 31){
+    CONFIG.days = v;
+    computeScores();
+    saveStorage();
+    rerenderAll();
+  }
+}
+
+function handleCSV(event){
+  var file = event.target.files[0];
+  if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try {
+      var text = e.target.result;
+      // Strip BOM
+      if(text.charCodeAt(0) === 0xFEFF) text = text.substr(1);
+      var lines = text.split(/\r?\n/).filter(function(l){return l.trim();});
+      if(lines.length < 2) throw new Error('CSV vacío');
+
+      // Detect separator
+      var sep = lines[0].split(';').length > lines[0].split(',').length ? ';' : ',';
+      var headers = parseCSVLine(lines[0], sep);
+
+      var iAgent = headers.findIndex(function(h){return h.trim().toLowerCase() === 'agent';});
+      var iCalls = headers.findIndex(function(h){return h.trim().toLowerCase() === 'calls answered';});
+      var iPct   = headers.findIndex(function(h){return h.trim().toLowerCase().indexOf('serviced') > -1;});
+      var iTmo   = headers.findIndex(function(h){return h.trim().toLowerCase() === 'talk time mean';});
+
+      if(iAgent < 0 || iCalls < 0 || iPct < 0 || iTmo < 0){
+        throw new Error('Columnas esperadas: Agent, Calls Answered, % Calls Serviced, Talk Time Mean');
+      }
+
+      // Aggregate per agent
+      var agg = {};
+      for(var i=1; i<lines.length; i++){
+        var cols = parseCSVLine(lines[i], sep);
+        var agent = (cols[iAgent]||'').trim();
+        if(!agent) continue;
+        if(/call center|totals|8200/i.test(agent)) continue;
+        var calls = parseInt(cols[iCalls]) || 0;
+        if(calls === 0) continue;
+        var pctRaw = (cols[iPct]||'').replace('%','').trim();
+        var pct = parseFloat(pctRaw) || 0;
+        var tmoStr = (cols[iTmo]||'').trim();
+        var tmoSec = parseTimeToSec(tmoStr);
+
+        // Clean name (strip leading "1234 ")
+        var clean = agent.replace(/^\d+\s+/, '').trim();
+        var ext = (agent.match(/^(\d+)/) || [])[1] || '';
+
+        if(!agg[clean]){
+          agg[clean] = {ext:ext, totalCalls:0, wPct:0, wTmo:0};
+        }
+        agg[clean].totalCalls += calls;
+        agg[clean].wPct += pct * calls;
+        agg[clean].wTmo += tmoSec * calls;
+      }
+
+      // Build new AGENTS
+      var newAgents = {};
+      Object.keys(agg).forEach(function(name){
+        var a = agg[name];
+        newAgents[name] = {
+          ext: a.ext,
+          calls: a.totalCalls,
+          tmo: Math.round(a.wTmo / a.totalCalls),
+          pct: +(a.wPct / a.totalCalls).toFixed(1)
+        };
+      });
+
+      if(Object.keys(newAgents).length === 0) throw new Error('No se encontraron agentes válidos');
+
+      AGENTS = newAgents;
+      computeScores();
+      saveStorage();
+      rerenderAll();
+      toast('CSV importado: ' + Object.keys(newAgents).length + ' agentes actualizados');
+      event.target.value = '';
+    } catch(err){
+      alert('Error importando CSV: ' + err.message);
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseCSVLine(line, sep){
+  var result = [];
+  var inQuote = false;
+  var cur = '';
+  for(var i=0; i<line.length; i++){
+    var c = line[i];
+    if(c === '"'){ inQuote = !inQuote; }
+    else if(c === sep && !inQuote){ result.push(cur); cur = ''; }
+    else { cur += c; }
+  }
+  result.push(cur);
+  return result;
+}
+
+function parseTimeToSec(t){
+  if(!t || t === '00:00:00') return 0;
+  var parts = t.split(':');
+  if(parts.length === 3) return (+parts[0])*3600 + (+parts[1])*60 + (+parts[2]);
+  if(parts.length === 2) return (+parts[0])*60 + (+parts[1]);
+  return parseFloat(t) || 0;
+}
+
+function exportData(){
+  var blob = new Blob([JSON.stringify({agents:AGENTS, wpp:WPP_SCORES, config:CONFIG}, null, 2)], {type:'application/json'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'performance_' + CONFIG.month.replace(/\s/g,'_') + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function resetData(){
+  if(!confirm('¿Restaurar datos originales? Se perderán los cambios manuales y puntajes Wpp.')) return;
+  AGENTS = JSON.parse(JSON.stringify(DEFAULT_AGENTS));
+  WPP_SCORES = {};
+  CONFIG = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+  computeScores();
+  saveStorage();
+  rerenderAll();
+  toast('Datos restaurados');
+}
+
+function toast(msg){
+  var t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(function(){t.style.opacity = '0'; t.style.transition='opacity 0.3s';}, 2500);
+  setTimeout(function(){t.remove();}, 3000);
+}
+
+// ============ INIT ============
+function init(){
+  loadStorage();
+  computeScores();
+  rerenderAll();
+}
+
+if(localStorage.getItem('fiancar_auth') === 'ok'){
+  document.getElementById('loginOverlay').style.display = 'none';
+  init();
+}
+</script>
+</body>
+</html>
