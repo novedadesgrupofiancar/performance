@@ -644,7 +644,10 @@ function computeScores(){
     else if(p >= 80) sc = 20;
     else if(p >= 75) sc = 15;
     else if(p >= 70) sc = 10;
-    else if(p >= 65) sc = 5;
+    else if(p >= 65) sc = 7;
+    else if(p >= 60) sc = 5;
+    else if(p >= 50) sc = 3;
+    else if(p >  0)  sc = 1;
     else             sc = 0;
     AGENTS[n].sc_pct = sc;
   });
