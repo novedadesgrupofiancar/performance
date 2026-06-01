@@ -171,7 +171,7 @@ tr.hl td{background:rgba(124,92,252,0.06);}
 .tmo-track{flex:1;height:18px;background:var(--border2);overflow:hidden;position:relative;}
 .tmo-fill{height:100%;}
 .tmo-val{font-family:var(--mono);font-size:12px;width:40px;text-align:right;}
-.tmo-objline{position:absolute;left:37.5%;top:0;bottom:0;width:1px;background:var(--yellow);opacity:0.7;}
+.tmo-objline{position:absolute;left:41%;top:0;bottom:0;width:1px;background:var(--yellow);opacity:0.7;}
 
 .task-section{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .task-panel{background:var(--surface2);border:1px solid var(--border);padding:18px;}
@@ -397,7 +397,7 @@ tr.hl td{background:rgba(124,92,252,0.06);}
     <div class="ov" style="border-top-color:var(--yellow)">
       <div class="ov-label">TMO promedio</div>
       <div class="ov-val" id="ov3">—</div>
-      <div class="ov-sub">Objetivo: 2:30</div>
+      <div class="ov-sub">Objetivo: 2:45</div>
     </div>
     <div class="ov" style="border-top-color:var(--blue)">
       <div class="ov-label">Agentes activos</div>
@@ -436,7 +436,7 @@ tr.hl td{background:rgba(124,92,252,0.06);}
       <div class="campaign-inputs" id="campaignInputs"></div>
       <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
         <button class="camp-update-btn" onclick="updateCampaignRanking()">⟳ Actualizar ranking de campañas</button>
-        <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">Puntajes: 1.º 25 · 2.º 20 · 3.º 15 · 4.º 5 · 5.º 0</span>
+        <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">Tramos: 10+ → 25 · 7-9 → 20 · 5-6 → 15 · 3-4 → 10 · 1-2 → 5 · 0 → 0</span>
       </div>
       <div id="campaignRankDisplay" style="margin-top:16px"></div>
     </div>
@@ -467,7 +467,7 @@ tr.hl td{background:rgba(124,92,252,0.06);}
         <div class="dpanel">
           <div class="sec-title" style="font-size:10px;margin-bottom:14px">TMO vs equipo</div>
           <div class="tmo-rows" id="tmoRows"></div>
-          <div style="margin-top:10px;font-size:11px;color:var(--muted);font-family:var(--mono)">▏línea amarilla = objetivo 2:30</div>
+          <div style="margin-top:10px;font-size:11px;color:var(--muted);font-family:var(--mono)">▏línea amarilla = objetivo 2:45</div>
         </div>
       </div>
       <div class="task-section" style="margin-top:12px">
@@ -608,36 +608,52 @@ function loadStorage(){
 // % Atendidas: ranked 1st-5th (30,22.5,15,7.5,0)
 // TMO: 25*(150/tmo), capped at 25
 
+function getCampaignPts(wins){
+  // Tramos absolutos: cumplir, no superar a otros
+  if(wins >= 10) return 25;
+  if(wins >= 7)  return 20;
+  if(wins >= 5)  return 15;
+  if(wins >= 3)  return 10;
+  if(wins >= 1)  return 5;
+  return 0;
+}
 function computeCampaignRanking(){
-  // Sort agents by campaign wins desc, assign rank
   var names = Object.keys(AGENTS);
+  // El rank lo mantenemos solo para mostrar posicion, pero los puntos van por tramos
   var sorted = names.slice().sort(function(a,b){
     return (CAMPAIGN_WINS[b]||0) - (CAMPAIGN_WINS[a]||0);
   });
-  var campRankPts = {1:25,2:20,3:15,4:5};
   sorted.forEach(function(n,i){
     AGENTS[n].campRank = i+1;
-    AGENTS[n].sc_camp = campRankPts[i+1] || 0;
+    AGENTS[n].sc_camp = getCampaignPts(CAMPAIGN_WINS[n]||0);
   });
 }
 
 function computeScores(){
   computeCampaignRanking();
 
-  // Rank by % attended for pct score (30%)
+  // % Atendidas por tramos de cumplimiento (no por ranking)
   var names = Object.keys(AGENTS);
   var sortedByPct = names.slice().sort(function(a,b){return AGENTS[b].pct - AGENTS[a].pct;});
-  var pctRankPts = {1:30,2:22.5,3:15,4:7.5};
-  sortedByPct.forEach(function(n,i){
-    AGENTS[n].pctRank = i+1;
-    AGENTS[n].sc_pct = pctRankPts[i+1] || 0;
+  sortedByPct.forEach(function(n,i){ AGENTS[n].pctRank = i+1; });
+  names.forEach(function(n){
+    var p = AGENTS[n].pct;
+    var sc;
+    if(p >= 90)      sc = 30;
+    else if(p >= 85) sc = 25;
+    else if(p >= 80) sc = 20;
+    else if(p >= 75) sc = 15;
+    else if(p >= 70) sc = 10;
+    else if(p >= 65) sc = 5;
+    else             sc = 0;
+    AGENTS[n].sc_pct = sc;
   });
 
   // Sort overall by total desc for main ranking
   names.forEach(function(name){
     var d = AGENTS[name];
     // TMO score (25%)
-    d.sc_tmo = d.tmo > 0 ? Math.min(+(25 * 150 / d.tmo).toFixed(1), 25) : 0;
+    d.sc_tmo = d.tmo > 0 ? Math.min(+(25 * 165 / d.tmo).toFixed(1), 25) : 0;
     // Task/Ownership score (20%) - manual, from TASK_SCORES
     d.sc_tasks = Math.min(TASK_SCORES[name] || 0, 20);
     // TMO display
@@ -689,7 +705,7 @@ function computeSpecialScore(sp){
 function sc(s){ return s>=80?'var(--green)':s>=66?'var(--yellow)':'var(--red)'; }
 function sl(s){ return s>=80?'VERDE':s>=66?'AMARILLO':'ROJO'; }
 function pc(p){ return p>=90?'var(--green)':p>=75?'var(--yellow)':'var(--red)'; }
-function tc(t){ return t<=150?'var(--green)':t<=180?'var(--yellow)':'var(--red)'; }
+function tc(t){ return t<=165?'var(--green)':t<=195?'var(--yellow)':'var(--red)'; }
 function rb(r){ return r===1?'g':r===2?'s':r===3?'b':''; }
 function getTotal(name){
   var d = AGENTS[name];
@@ -837,12 +853,11 @@ function renderCampaignRankTable(){
   var sorted = names.slice().sort(function(a,b){
     return (CAMPAIGN_WINS[b]||0) - (CAMPAIGN_WINS[a]||0);
   });
-  var campPts = {1:25,2:20,3:15,4:5};
   var html = '<table style="margin-bottom:0"><thead><tr><th>#</th><th>Agente</th><th class="r">Campañas ganadas</th><th class="r">Puntos</th></tr></thead><tbody>';
   sorted.forEach(function(n,i){
     var rank = i+1;
     var wins = CAMPAIGN_WINS[n]||0;
-    var pts = campPts[rank]||0;
+    var pts = getCampaignPts(wins);
     html += '<tr><td><span class="rank-b '+rb(rank)+'">'+rank+'</span></td>' +
       '<td><div class="aname">'+n+'</div></td>' +
       '<td style="text-align:right;font-family:var(--mono)">'+wins+'</td>' +
@@ -944,7 +959,7 @@ function buildDetailContent(name){
 
   var kpis = [
     {key:'pct',  label:'% Atendidas',   val:d.pct.toFixed(1)+'%',  sub:'obj: 90% (click para editar)', color:pc(d.pct), editable:true},
-    {key:'tmo',  label:'TMO',           val:d.tmod,                 sub:'obj: 2:30 (click para editar)',color:tc(d.tmo), editable:true},
+    {key:'tmo',  label:'TMO',           val:d.tmod,                 sub:'obj: 2:45 (click para editar)',color:tc(d.tmo), editable:true},
     {key:null,   label:'Ranking llamadas', val:'#'+d.pctRank,       sub:'por % atendidas',              color:'var(--blue)'},
     {key:null,   label:'Rank. campañas',  val:'#'+d.campRank,       sub:(CAMPAIGN_WINS[name]||0)+' ganadas',color:'var(--yellow)'}
   ];
@@ -1032,8 +1047,8 @@ function generateNote(name, d){
   if(d.pct >= 90) strengths.push('% de atención dentro del objetivo');
   else if(d.pct >= 75) issues.push('% de atención bajo objetivo (90%)');
   else issues.push('% de atención muy por debajo del objetivo');
-  if(d.tmo <= 150) strengths.push('TMO óptimo');
-  else if(d.tmo <= 180) issues.push('TMO ligeramente sobre objetivo (2:30)');
+  if(d.tmo <= 165) strengths.push('TMO óptimo');
+  else if(d.tmo <= 195) issues.push('TMO ligeramente sobre objetivo (2:45)');
   else issues.push('TMO muy elevado');
   if(d.campRank <= 2) strengths.push('top del equipo en campañas');
   else if(d.campRank >= 5) issues.push('bajo en campañas');
