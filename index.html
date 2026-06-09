@@ -1630,53 +1630,31 @@ function buildAgentContext(val){
   return { name: name, context: ctx };
 }
 
-async function generateFODA(){
+function generateFODA(){
   var val = document.getElementById('fbAgentSelect').value;
   if(!val){ alert('Seleccioná un agente primero.'); return; }
 
   var info = buildAgentContext(val);
   if(!info){ alert('No se pudieron obtener datos del agente.'); return; }
 
-  var btn = document.getElementById('fbGenBtn');
-  btn.disabled = true;
-  btn.textContent = '⟳ Generando...';
   document.getElementById('fbResult').style.display = 'none';
   document.getElementById('fbError').style.display = 'none';
 
-  var prompt = 'Sos supervisor de un Contact Center en Uruguay (Grupo Fiancar). Tenés los siguientes datos de desempeño de un agente para el mes ' + CONFIG.month + ':\n\n' + info.context + '\n\nRedactá un análisis FODA personalizado para darle feedback mensual a este agente. El análisis debe:\n- Estar en español rioplatense (vos/che)\n- Ser concreto, empático y profesional\n- Tener exactamente 4 secciones: FORTALEZAS, OPORTUNIDADES, DEBILIDADES, AMENAZAS\n- Cada sección con 2-3 puntos breves\n- Al final, una sección "RECOMENDACIÓN DEL MES" con 2-3 acciones concretas\n- Usar los datos reales provistos\n- Tono motivador pero honesto\n\nFormatear la respuesta con los títulos en mayúsculas y cada punto precedido por →';
+  // Build the prompt to copy to Claude chat
+  var prompt = 'Generá un análisis FODA de feedback mensual para este agente de Contact Center (Grupo Fiancar, Uruguay).\n\n' + info.context + '\n\nEl análisis debe:\n- Estar en español rioplatense\n- Tener 4 secciones: FORTALEZAS, OPORTUNIDADES, DEBILIDADES, AMENAZAS (2-3 puntos cada una)\n- Cerrar con RECOMENDACIÓN DEL MES (2-3 acciones concretas)\n- Cada punto precedido por →\n- Tono motivador pero honesto, usando los datos reales';
 
-  try {
-    var res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    var data = await res.json();
-    if(data.error){ throw new Error(data.error.message); }
-    var text = data.content && data.content[0] ? data.content[0].text : '';
-    if(!text) throw new Error('Respuesta vacía');
+  window._lastFeedbackText = prompt;
 
-    // Format nicely
-    var formatted = text
-      .replace(/\n\n/g, '<br><br>')
-      .replace(/\n/g, '<br>')
-      .replace(/(FORTALEZAS|OPORTUNIDADES|DEBILIDADES|AMENAZAS|RECOMENDACIÓN DEL MES)/g, '<strong style="color:var(--accent);font-family:var(--mono);letter-spacing:1px;display:block;margin-top:14px;margin-bottom:4px">$1</strong>')
-      .replace(/→/g, '<span style="color:var(--accent)">→</span>');
+  // Show the prompt in result area so user can copy it
+  var formatted = prompt
+    .replace(/\n\n/g, '<br><br>')
+    .replace(/\n/g, '<br>');
 
-    document.getElementById('fbResultContent').innerHTML =
-      '<div style="font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px">ANÁLISIS FODA — ' + info.name.toUpperCase() + ' — ' + CONFIG.month + '</div>' + formatted;
-    document.getElementById('fbResult').style.display = 'block';
-    window._lastFeedbackText = text;
-  } catch(err) {
-    document.getElementById('fbError').textContent = 'Error al generar: ' + err.message;
-    document.getElementById('fbError').style.display = 'block';
-  }
-  btn.disabled = false;
-  btn.textContent = '✦ Generar análisis FODA';
+  document.getElementById('fbResultContent').innerHTML =
+    '<div style="font-family:var(--mono);font-size:10px;color:var(--yellow);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;padding:8px 10px;background:rgba(245,200,66,0.08);border:1px solid rgba(245,200,66,0.2)">'+
+    '⚠ Copiá este texto y pegalo en el chat de Claude para generar el FODA</div>' +
+    '<div style="background:var(--surface2);border:1px solid var(--border);padding:12px;font-family:var(--mono);font-size:11px;color:var(--text2);line-height:1.7;white-space:pre-wrap;word-break:break-word">' + prompt.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>';
+  document.getElementById('fbResult').style.display = 'block';
 }
 
 function copyFeedback(){
