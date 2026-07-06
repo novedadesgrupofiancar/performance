@@ -296,7 +296,6 @@ tr.hl td{background:rgba(124,92,252,0.06);}
     <div class="badge" id="monthBadge">MAYO 2026</div>
     <div class="badge badge-yellow">OBJ ATENCIÓN: 90%</div>
     <div class="badge badge-action" onclick="toggleDataManager()">⚙ Gestionar datos</div>
-    <div class="badge badge-action" id="feedbackBadgeBtn" onclick="openFeedbackModal()" style="color:#22d47a;border-color:rgba(34,212,122,0.3);background:rgba(34,212,122,0.08)">✦ Generar Feedback</div>
     <div class="badge badge-action" onclick="logout()">↪ Salir</div>
   </div>
 </div>
@@ -533,11 +532,11 @@ tr.hl td{background:rgba(124,92,252,0.06);}
       <div class="task-lbl" style="margin-bottom:6px">Contexto adicional (opcional)</div>
       <textarea id="fbContext" placeholder="Ej: tuvo días de ausentismo, cambios de turno, situación personal..." style="width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:12px;padding:10px 12px;outline:none;resize:vertical;min-height:64px;line-height:1.5"></textarea>
     </div>
-    <button class="task-save" id="fbGenBtn" style="width:100%;padding:10px;font-size:13px" onclick="generateFODA()">✦ Generar análisis FODA</button>
+    <button class="task-save" id="fbGenBtn" style="width:100%;padding:10px;font-size:13px" onclick="generateFODA()">✦ Generar prompt para Claude</button>
     <div id="fbResult" style="margin-top:16px;display:none">
       <div style="height:1px;background:var(--border);margin-bottom:16px"></div>
       <div id="fbResultContent" style="font-size:13px;color:var(--text);line-height:1.7"></div>
-      <button class="dbtn" onclick="copyFeedback()" style="width:100%;margin-top:12px">⎘ Copiar texto</button>
+      <button class="dbtn" onclick="copyFeedback()" style="width:100%;margin-top:12px">⎘ Copiar prompt</button>
     </div>
     <div id="fbError" style="display:none;margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--red);text-align:center"></div>
   </div>
@@ -631,7 +630,6 @@ function loadStorage(){
     TASK_SCORES = t ? JSON.parse(t) : {};
     CONFIG = c ? JSON.parse(c) : JSON.parse(JSON.stringify(DEFAULT_CONFIG));
     CAMPAIGN_WINS = ca ? JSON.parse(ca) : {};
-    // Migrate old special agent names if needed
     migrateSpecialNames();
   }catch(e){
     AGENTS = JSON.parse(JSON.stringify(DEFAULT_AGENTS));
@@ -643,18 +641,11 @@ function loadStorage(){
 }
 
 function migrateSpecialNames(){
-  var nameMap = {
-    'Piero Paganini': 'Piero Britos',
-    'Shoanna Silveira': 'Shoanna Olveira'
-  };
+  var nameMap = {'Piero Paganini':'Piero Britos','Shoanna Silveira':'Shoanna Olveira'};
   var changed = false;
   Object.keys(nameMap).forEach(function(oldName){
     var newName = nameMap[oldName];
-    if(SPECIAL[oldName]){
-      SPECIAL[newName] = SPECIAL[oldName];
-      delete SPECIAL[oldName];
-      changed = true;
-    }
+    if(SPECIAL[oldName]){ SPECIAL[newName]=SPECIAL[oldName]; delete SPECIAL[oldName]; changed=true; }
   });
   if(changed) saveStorage();
 }
@@ -812,7 +803,7 @@ function buildFilters(){
   });
   // Special agents
   Object.keys(SPECIAL).forEach(function(n){
-    html += '<button class="fbtn special" data-agent="sp_'+n+'" onclick="filterSpecial(\''+n+'\',this)">'+n.split(' ')[0]+'</button>';
+    html += '<button class="fbtn special" data-agent="sp_'+n+'" onclick="filterSpecial(\''+n+'\',this)">'  +n.split(' ')[0]+'</button>';
   });
   document.getElementById('filterBtns').innerHTML = html;
 }
@@ -1564,14 +1555,13 @@ function toggleDataManager(){
 
 // ============ FEEDBACK FODA ============
 function openFeedbackModal(){
-  // Populate agent selector
   var sel = document.getElementById('fbAgentSelect');
   sel.innerHTML = '<option value="">— Seleccioná un agente —</option>';
   Object.keys(AGENTS).forEach(function(n){
     sel.innerHTML += '<option value="regular:'+n+'">'+n+'</option>';
   });
   Object.keys(SPECIAL).forEach(function(n){
-    sel.innerHTML += '<option value="special:'+n+'">'+n+' (Evaluación especial)</option>';
+    sel.innerHTML += '<option value="special:'+n+'">'+n+' (Eval. especial)</option>';
   });
   document.getElementById('fbResult').style.display = 'none';
   document.getElementById('fbError').style.display = 'none';
@@ -1579,99 +1569,218 @@ function openFeedbackModal(){
   document.getElementById('fbAgentLabel').textContent = '';
   document.getElementById('feedbackModal').classList.add('open');
 }
-
-function closeFeedbackModal(){
-  document.getElementById('feedbackModal').classList.remove('open');
-}
-
+function closeFeedbackModal(){ document.getElementById('feedbackModal').classList.remove('open'); }
 function updateFbAgentLabel(){
   var val = document.getElementById('fbAgentSelect').value;
-  if(!val){ document.getElementById('fbAgentLabel').textContent = ''; return; }
-  var name = val.split(':').slice(1).join(':');
+  var name = val ? val.split(':').slice(1).join(':') : '';
   document.getElementById('fbAgentLabel').textContent = name.toUpperCase();
 }
-
 function buildAgentContext(val){
-  var parts = val.split(':');
-  var type = parts[0];
-  var name = parts.slice(1).join(':');
+  var parts = val.split(':'); var type = parts[0]; var name = parts.slice(1).join(':');
   var trend = document.getElementById('fbTrend').value;
   var extra = document.getElementById('fbContext').value.trim();
-
-  var ctx = 'Agente: ' + name + '\nMes: ' + CONFIG.month + '\nTendencia: ' + trend + '\n\n';
-
+  var ctx = 'Agente: '+name+'\nMes: '+CONFIG.month+'\nTendencia: '+trend+'\n\n';
   if(type === 'regular'){
-    var d = AGENTS[name];
-    if(!d) return null;
+    var d = AGENTS[name]; if(!d) return null;
     var tasks = TASK_SCORES[name] || 0;
     ctx += '--- MÉTRICAS REGULARES ---\n';
-    ctx += '% Llamadas atendidas: ' + d.pct.toFixed(1) + '% (obj: 90%)\n';
-    ctx += 'TMO: ' + d.tmod + ' (obj: 2:45)\n';
-    ctx += 'Ranking general: #' + d.rank + ' de ' + Object.keys(AGENTS).length + '\n';
-    ctx += 'Campañas ganadas: ' + (CAMPAIGN_WINS[name]||0) + ' (rank #' + d.campRank + ')\n';
-    ctx += 'Ownership/Tareas: ' + tasks + '/20 pts\n';
-    ctx += 'Puntaje total: ' + d.totalFull.toFixed(1) + '/100\n';
-    ctx += 'Desglose: Atención=' + d.sc_pct + ' | TMO=' + d.sc_tmo + ' | Campañas=' + d.sc_camp + ' | Ownership=' + tasks + '\n';
-    ctx += 'Tareas asignadas: ' + d.tasks + '\n';
+    ctx += '% Llamadas atendidas: '+d.pct.toFixed(1)+'% (obj: 90%)\n';
+    ctx += 'TMO: '+d.tmod+' (obj: 2:45)\n';
+    ctx += 'Ranking general: #'+d.rank+' de '+Object.keys(AGENTS).length+'\n';
+    ctx += 'Campañas ganadas: '+(CAMPAIGN_WINS[name]||0)+' (rank #'+d.campRank+')\n';
+    ctx += 'Ownership/Tareas: '+tasks+'/20 pts\n';
+    ctx += 'Puntaje total: '+d.totalFull.toFixed(1)+'/100\n';
+    ctx += 'Desglose: Atención='+d.sc_pct+' | TMO='+d.sc_tmo+' | Campañas='+d.sc_camp+' | Ownership='+tasks+'\n';
+    ctx += 'Tareas asignadas: '+d.tasks+'\n';
   } else {
-    var sp = SPECIAL[name];
-    if(!sp) return null;
+    var sp = SPECIAL[name]; if(!sp) return null;
     computeSpecialScore(sp);
     ctx += '--- EVALUACIÓN ESPECIAL ---\n';
-    ctx += 'Encuestas de satisfacción: ' + sp.surveyPct.toFixed(1) + '% → ' + sp.sc_survey + '/50 pts\n';
-    ctx += 'Estado tareas/redes/wpp: ' + sp.tasksState + ' → ' + sp.sc_tasks + '/20 pts\n';
-    ctx += 'Actitud: ' + sp.attitude + ' → ' + sp.sc_attitude + '/30 pts\n';
-    ctx += 'Puntaje total: ' + sp.total + '/100\n';
-    if(sp.postVentasPct) ctx += '% Post ventas: ' + sp.postVentasPct + '%\n';
-    ctx += 'Tareas asignadas: ' + sp.tasks + '\n';
+    ctx += 'Encuestas satisfacción: '+sp.surveyPct.toFixed(1)+'% → '+sp.sc_survey+'/50 pts\n';
+    ctx += 'Estado tareas/redes/wpp: '+sp.tasksState+' → '+sp.sc_tasks+'/20 pts\n';
+    ctx += 'Actitud: '+sp.attitude+' → '+sp.sc_attitude+'/30 pts\n';
+    ctx += 'Puntaje total: '+sp.total+'/100\n';
+    if(sp.postVentasPct) ctx += '% Post ventas: '+sp.postVentasPct+'%\n';
+    ctx += 'Tareas asignadas: '+sp.tasks+'\n';
   }
-
-  if(extra) ctx += '\nContexto adicional: ' + extra;
+  if(extra) ctx += '\nContexto adicional: '+extra;
   return { name: name, context: ctx };
 }
-
 function generateFODA(){
   var val = document.getElementById('fbAgentSelect').value;
   if(!val){ alert('Seleccioná un agente primero.'); return; }
-
   var info = buildAgentContext(val);
   if(!info){ alert('No se pudieron obtener datos del agente.'); return; }
-
   document.getElementById('fbResult').style.display = 'none';
   document.getElementById('fbError').style.display = 'none';
-
-  // Build the prompt to copy to Claude chat
-  var prompt = 'Generá un análisis FODA de feedback mensual para este agente de Contact Center (Grupo Fiancar, Uruguay).\n\n' + info.context + '\n\nEl análisis debe:\n- Estar en español rioplatense\n- Tener 4 secciones: FORTALEZAS, OPORTUNIDADES, DEBILIDADES, AMENAZAS (2-3 puntos cada una)\n- Cerrar con RECOMENDACIÓN DEL MES (2-3 acciones concretas)\n- Cada punto precedido por →\n- Tono motivador pero honesto, usando los datos reales';
-
+  var prompt = 'Generá un análisis FODA de feedback mensual para este agente de Contact Center (Grupo Fiancar, Uruguay).\n'+info.context+'\nEl análisis debe:\n- Estar en español rioplatense\n- Tener 4 secciones: FORTALEZAS, OPORTUNIDADES, DEBILIDADES, AMENAZAS (2-3 puntos cada una)\n- Cerrar con RECOMENDACIÓN DEL MES (2-3 acciones concretas)\n- Cada punto precedido por →\n- Tono motivador pero honesto, usando los datos reales';
   window._lastFeedbackText = prompt;
-
-  // Show the prompt in result area so user can copy it
-  var formatted = prompt
-    .replace(/\n\n/g, '<br><br>')
-    .replace(/\n/g, '<br>');
-
+  var escaped = prompt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   document.getElementById('fbResultContent').innerHTML =
-    '<div style="font-family:var(--mono);font-size:10px;color:var(--yellow);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;padding:8px 10px;background:rgba(245,200,66,0.08);border:1px solid rgba(245,200,66,0.2)">'+
-    '⚠ Copiá este texto y pegalo en el chat de Claude para generar el FODA</div>' +
-    '<div style="background:var(--surface2);border:1px solid var(--border);padding:12px;font-family:var(--mono);font-size:11px;color:var(--text2);line-height:1.7;white-space:pre-wrap;word-break:break-word">' + prompt.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>';
+    '<div style="font-family:var(--mono);font-size:10px;color:var(--yellow);letter-spacing:1px;padding:8px 10px;background:rgba(245,200,66,0.08);border:1px solid rgba(245,200,66,0.2);margin-bottom:10px">'+
+    '⚠ Copiá este prompt y pegalo en el chat de Claude para obtener el FODA</div>'+
+    '<div style="background:var(--surface2);border:1px solid var(--border);padding:12px;font-family:var(--mono);font-size:11px;color:var(--text2);line-height:1.7;white-space:pre-wrap;word-break:break-word">'+escaped+'</div>';
   document.getElementById('fbResult').style.display = 'block';
 }
-
 function copyFeedback(){
   var text = window._lastFeedbackText || '';
   if(!text) return;
-  navigator.clipboard.writeText(text).then(function(){
-    toast('Feedback copiado al portapapeles');
-  }).catch(function(){
-    // fallback
-    var ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    toast('Feedback copiado al portapapeles');
+  navigator.clipboard.writeText(text).then(function(){ toast('Prompt copiado al portapapeles'); }).catch(function(){
+    var ta = document.createElement('textarea'); ta.value = text;
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    toast('Prompt copiado al portapapeles');
   });
+}
+
+// ============ EXPORT SNAPSHOT ============
+function exportSnapshot(){
+  var btn = document.getElementById('exportBtn');
+  btn.textContent = '⟳ Generando...';
+  btn.style.pointerEvents = 'none';
+
+  // Dynamically load html2canvas if needed
+  function doCapture(){
+    // Build a clean capture container
+    var month = CONFIG.month || 'MES';
+    var captureEl = document.createElement('div');
+    captureEl.id = 'snapshotCapture';
+    captureEl.style.cssText = 'position:fixed;left:-9999px;top:0;background:#0a0a0f;padding:32px;width:1000px;font-family:Space Grotesk,sans-serif;';
+
+    // Header block
+    var headerHtml = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid #252535">' +
+      '<div>' +
+        '<div style="font-size:22px;font-weight:700;color:#eeeef5;letter-spacing:-0.5px">grupo<span style="color:#7c5cfc">fiancar</span></div>' +
+        '<div style="font-size:13px;color:#9898b8;margin-top:4px">Performance Contact Center — '+month+'</div>' +
+      '</div>' +
+      '<div style="font-family:DM Mono,monospace;font-size:11px;color:#55556a;text-align:right">Exportado: '+new Date().toLocaleDateString('es-UY',{day:'2-digit',month:'2-digit',year:'numeric'})+'<br>Días hábiles: '+CONFIG.days+'</div>' +
+    '</div>';
+
+    // Overview stats
+    var agentKeys = Object.keys(AGENTS);
+    var avgPct = agentKeys.reduce(function(s,n){return s+AGENTS[n].pct;},0)/agentKeys.length;
+    var avgTmo = agentKeys.reduce(function(s,n){return s+AGENTS[n].tmo;},0)/agentKeys.length;
+    var ovHtml = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px">' +
+      ovCard('% Atend. promedio', avgPct.toFixed(1)+'%', avgPct>=90?'#22d47a':avgPct>=75?'#f5c842':'#ff3a5c') +
+      ovCard('TMO promedio', fmtSec(Math.round(avgTmo)), avgTmo<=165?'#22d47a':avgTmo<=195?'#f5c842':'#ff3a5c') +
+      ovCard('Agentes activos', agentKeys.length, '#4d8eff') +
+      ovCard('Días hábiles', CONFIG.days, '#7c5cfc') +
+    '</div>';
+
+    // Ranking table
+    var sorted = agentKeys.slice().sort(function(a,b){return AGENTS[a].rank-AGENTS[b].rank;});
+    var rows = sorted.map(function(name){
+      var d = AGENTS[name];
+      var total = d.totalFull;
+      var col = total>=80?'#22d47a':total>=66?'#f5c842':'#ff3a5c';
+      var pctCol = d.pct>=90?'#22d47a':d.pct>=75?'#f5c842':'#ff3a5c';
+      var tmoCol = d.tmo<=165?'#22d47a':d.tmo<=195?'#f5c842':'#ff3a5c';
+      var rankCol = d.rank===1?'#f5c842':d.rank===2?'#aaaacc':d.rank===3?'#cd7f32':'#55556a';
+      return '<tr style="border-bottom:1px solid #252535">' +
+        '<td style="padding:11px 10px;font-family:DM Mono,monospace;font-size:13px;color:'+rankCol+';font-weight:700">#'+d.rank+'</td>'+
+        '<td style="padding:11px 10px"><div style="font-size:13px;font-weight:600;color:#eeeef5">'+name+'</div></td>'+
+        '<td style="padding:11px 10px;text-align:right;font-family:DM Mono,monospace;font-size:13px;color:'+pctCol+'">'+d.pct.toFixed(1)+'%</td>'+
+        '<td style="padding:11px 10px;text-align:right;font-family:DM Mono,monospace;font-size:13px;color:'+tmoCol+'">'+d.tmod+'</td>'+
+        '<td style="padding:11px 10px;text-align:right;font-family:DM Mono,monospace;font-size:13px;color:#f5c842">'+(CAMPAIGN_WINS[name]||0)+'</td>'+
+        '<td style="padding:11px 10px;text-align:right"><span style="font-family:DM Mono,monospace;font-size:15px;font-weight:700;color:'+col+'">'+total.toFixed(0)+'</span><span style="font-size:10px;color:#55556a">/100</span></td>'+
+      '</tr>';
+    }).join('');
+
+    var tableHtml = '<div style="margin-bottom:6px;font-family:DM Mono,monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#9898b8">Ranking de desempeño</div>'+
+      '<table style="width:100%;border-collapse:collapse;background:#13131a;border:1px solid #252535">'+
+      '<thead><tr style="border-bottom:1px solid #2e2e42">'+
+        '<th style="padding:9px 10px;font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#55556a;font-weight:400;text-align:left">#</th>'+
+        '<th style="padding:9px 10px;font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#55556a;font-weight:400;text-align:left">Agente</th>'+
+        '<th style="padding:9px 10px;font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#55556a;font-weight:400;text-align:right">% Atend.</th>'+
+        '<th style="padding:9px 10px;font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#55556a;font-weight:400;text-align:right">TMO</th>'+
+        '<th style="padding:9px 10px;font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#55556a;font-weight:400;text-align:right">Campañas</th>'+
+        '<th style="padding:9px 10px;font-family:DM Mono,monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#55556a;font-weight:400;text-align:right">Puntaje</th>'+
+      '</tr></thead><tbody>'+rows+'</tbody></table>';
+
+    // Special agents
+    var spKeys = Object.keys(SPECIAL);
+    var spHtml = '';
+    if(spKeys.length){
+      spHtml = '<div style="margin-top:20px;margin-bottom:6px;font-family:DM Mono,monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#9898b8">Evaluación especial</div>'+
+        '<div style="display:grid;grid-template-columns:repeat('+Math.min(spKeys.length,2)+',1fr);gap:10px">';
+      spKeys.forEach(function(name){
+        var sp = SPECIAL[name]; computeSpecialScore(sp);
+        var col = sp.total>=80?'#22d47a':sp.total>=66?'#f5c842':'#ff3a5c';
+        spHtml += '<div style="background:#13131a;border:1px solid rgba(245,200,66,0.2);padding:14px">'+
+          '<div style="font-size:13px;font-weight:600;color:#eeeef5;margin-bottom:10px">'+name+'</div>'+
+          '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px">'+
+            spStatBlock('Encuestas', sp.surveyPct.toFixed(1)+'%', sp.sc_survey+'/50', sp.surveyPct>=90?'#22d47a':sp.surveyPct>=75?'#f5c842':'#ff3a5c')+
+            spStatBlock('Tareas', sp.tasksState.split(' ')[0], sp.sc_tasks+'/20', '#7c5cfc')+
+            spStatBlock('Actitud', sp.attitude.split(' ')[0], sp.sc_attitude+'/30', '#22d47a')+
+          '</div>'+
+          '<div style="font-family:DM Mono,monospace;font-size:22px;font-weight:700;color:'+col+'">'+sp.total+' <span style="font-size:12px;color:#55556a">/100</span></div>'+
+        '</div>';
+      });
+      spHtml += '</div>';
+    }
+
+    // Footer
+    var footerHtml = '<div style="margin-top:20px;padding-top:12px;border-top:1px solid #252535;display:flex;justify-content:space-between;align-items:center">'+
+      '<div style="font-family:DM Mono,monospace;font-size:9px;color:#55556a;letter-spacing:1.5px;text-transform:uppercase">Grupo Fiancar — Uso interno</div>'+
+      '<div style="font-family:DM Mono,monospace;font-size:9px;color:#55556a;letter-spacing:1px">Leyenda: ≥80 VERDE · 66-79 AMARILLO · &lt;66 ROJO</div>'+
+    '</div>';
+
+    captureEl.innerHTML = headerHtml + ovHtml + tableHtml + spHtml + footerHtml;
+    document.body.appendChild(captureEl);
+
+    html2canvas(captureEl, {
+      backgroundColor: '#0a0a0f',
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      width: 1000,
+      windowWidth: 1000
+    }).then(function(canvas){
+      document.body.removeChild(captureEl);
+      var link = document.createElement('a');
+      var filename = 'performance_' + (CONFIG.month||'mes').replace(/\s/g,'_') + '_' + new Date().toISOString().slice(0,10) + '.png';
+      link.download = filename;
+      link.href = canvas.toDataURL('image/png');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      btn.textContent = '📷 Exportar imagen';
+      btn.style.pointerEvents = '';
+      toast('Imagen exportada: ' + filename);
+    }).catch(function(err){
+      document.body.removeChild(captureEl);
+      btn.textContent = '📷 Exportar imagen';
+      btn.style.pointerEvents = '';
+      alert('Error al exportar: ' + err.message);
+    });
+  }
+
+  if(typeof html2canvas !== 'undefined'){
+    doCapture();
+  } else {
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    s.onload = doCapture;
+    s.onerror = function(){
+      btn.textContent = '📷 Exportar imagen';
+      btn.style.pointerEvents = '';
+      alert('No se pudo cargar html2canvas. Verificá tu conexión.');
+    };
+    document.head.appendChild(s);
+  }
+}
+
+function ovCard(label, val, color){
+  return '<div style="background:#13131a;border:1px solid #252535;border-top:2px solid '+color+';padding:14px 12px">'+
+    '<div style="font-family:DM Mono,monospace;font-size:9px;color:#9898b8;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">'+label+'</div>'+
+    '<div style="font-size:26px;font-weight:700;color:'+color+'">'+val+'</div>'+
+  '</div>';
+}
+function spStatBlock(label, val, pts, color){
+  return '<div style="background:#0a0a0f;border:1px solid #252535;padding:8px">'+
+    '<div style="font-family:DM Mono,monospace;font-size:8px;color:#55556a;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px">'+label+'</div>'+
+    '<div style="font-size:12px;font-weight:600;color:'+color+'">'+val+'</div>'+
+    '<div style="font-family:DM Mono,monospace;font-size:10px;color:#55556a">'+pts+'</div>'+
+  '</div>';
 }
 
 // ============ INIT ============
