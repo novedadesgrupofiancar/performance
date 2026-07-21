@@ -297,6 +297,7 @@ tr.hl td{background:rgba(124,92,252,0.06);}
     <div class="badge badge-yellow">OBJ ATENCIÓN: 90%</div>
     <div class="badge badge-action" onclick="toggleDataManager()">⚙ Gestionar datos</div>
     <div class="badge badge-action" onclick="openFeedbackModal()" style="color:#22d47a;border-color:rgba(34,212,122,0.3);background:rgba(34,212,122,0.08)">✦ Generar Feedback</div>
+    <div class="badge badge-action" onclick="openLeadsPanel()" style="color:#f5a623;border-color:rgba(245,166,35,0.3);background:rgba(245,166,35,0.08)" id="leadsBtn">📊 Leads Diarios</div>
     <div class="badge badge-action" onclick="exportSnapshot()" style="color:#4d8eff;border-color:rgba(77,142,255,0.3);background:rgba(77,142,255,0.08)" id="exportBtn">📷 Exportar imagen</div>
     <div class="badge badge-action" onclick="logout()">↪ Salir</div>
   </div>
@@ -544,6 +545,43 @@ tr.hl td{background:rgba(124,92,252,0.06);}
   </div>
 </div>
 
+<!-- LEADS DIARIOS MODAL -->
+<div class="modal-overlay" id="leadsModal" style="align-items:flex-start;padding:24px;overflow-y:auto;">
+  <div class="modal" style="width:900px;max-width:96vw;max-height:90vh;overflow-y:auto;padding:28px 28px 24px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div>
+        <div class="modal-title" style="font-size:18px">📊 Control de Leads Diarios</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;margin-top:3px" id="leadsDateLabel"></div>
+      </div>
+      <button class="modal-btn" onclick="closeLeadsPanel()" style="flex:none;width:auto;padding:6px 14px">✕</button>
+    </div>
+    <div style="margin-bottom:16px">
+      <div class="task-lbl" style="margin-bottom:6px">Fecha (YYYY-MM-DD)</div>
+      <input type="date" id="leadsDateInput" style="width:100%;padding:8px 10px;font-size:13px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:var(--font);">
+    </div>
+    <div style="margin-bottom:16px;overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="background:var(--surface2);border-bottom:1px solid var(--border)">
+            <th style="padding:8px;text-align:left;font-weight:600">Agente</th>
+            <th style="padding:8px;text-align:center">Leads Asignados</th>
+            <th style="padding:8px;text-align:center">Leads Contactados</th>
+            <th style="padding:8px;text-align:center">% Contactación</th>
+            <th style="padding:8px;text-align:center">Confirmaciones sin error</th>
+            <th style="padding:8px;text-align:center">WhatsApp Cerrado</th>
+          </tr>
+        </thead>
+        <tbody id="leadsTableBody"></tbody>
+      </table>
+    </div>
+    <div style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="task-save" onclick="saveLeadsDay()" style="flex:1;min-width:120px">💾 Guardar día</button>
+      <button class="dbtn" onclick="exportLeadsCSV()" style="flex:1;min-width:120px">⬇ Exportar CSV</button>
+    </div>
+    <div id="leadsError" style="display:none;margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--red);text-align:center"></div>
+  </div>
+</div>
+
 <!-- EDIT MODAL -->
 <div class="modal-overlay" id="editModal">
   <div class="modal">
@@ -568,17 +606,17 @@ tr.hl td{background:rgba(124,92,252,0.06);}
 // ============ DEFAULT DATA ============
 // Regular agents (participate in call ranking)
 var DEFAULT_AGENTS = {
-  "Melani Barrero":  {ext:"7994",tmo:125,pct:95.8,tasks:'Confirmacion de taller'},
+  "Melanie Barrero":  {ext:"7994",tmo:125,pct:95.8,tasks:'Confirmacion de taller'},
   "Sabrina Lapaz":   {ext:"7995",tmo:170,pct:79.7,tasks:'Whatsapp (Alto volumen)'},
   "Natasha Piriz":   {ext:"7996",tmo:156,pct:63.6,tasks:'Whatsapp + Encuestas Geely'},
-  "Isabel Crosa":    {ext:"7997",tmo:109,pct:87.4,tasks:'Redes sociales (FB/IG)'},
+  "Isabel Crossa":    {ext:"7997",tmo:109,pct:87.4,tasks:'Redes sociales (FB/IG)'},
   "Damian Chmiel":   {ext:"8004",tmo:153,pct:65.1,tasks:'Confirmacion de taller'},
   "Alvaro Cuello":   {ext:"8003",tmo:166,pct:73.5,tasks:'Whatsapp (Alto volumen)'}
 };
 
 // Special agents (Piero & Shoanna - separate evaluation system)
 var DEFAULT_SPECIAL = {
-  "Piero Britos": {
+  "Piero Paganini": {
     ext:"7998",
     tasks:'Encuestas + ARS + Recordatorio + Wpp Chevrolet',
     surveyPct: 100,  // % encuestas
@@ -586,7 +624,7 @@ var DEFAULT_SPECIAL = {
     attitude: 'Actitud ejemplar',
     postVentasPct: 81
   },
-  "Shoanna Olveira": {
+  "Shoanna Silveira": {
     ext:"7999",
     tasks:'Encuestas + Recordatorio + Calidad Wpp',
     surveyPct: 100,
@@ -1785,9 +1823,164 @@ function spStatBlock(label, val, pts, color){
   '</div>';
 }
 
+// ============ LEADS TRACKING ============
+var LEADS_DATA = {}; // { "YYYY-MM-DD": { agentName: { assigned, contacted, confirma, whatsapp } } }
+
+function loadLeadsData(){
+  try{
+    var stored = localStorage.getItem('fiancar_leads');
+    LEADS_DATA = stored ? JSON.parse(stored) : {};
+  }catch(e){
+    LEADS_DATA = {};
+  }
+}
+
+function saveLeadsData(){
+  localStorage.setItem('fiancar_leads', JSON.stringify(LEADS_DATA));
+}
+
+function openLeadsPanel(){
+  loadLeadsData();
+  var today = new Date().toISOString().split('T')[0];
+  document.getElementById('leadsDateInput').value = today;
+  document.getElementById('leadsDateLabel').textContent = today.toUpperCase();
+  renderLeadsTable(today);
+  document.getElementById('leadsModal').classList.add('open');
+}
+
+function closeLeadsPanel(){
+  document.getElementById('leadsModal').classList.remove('open');
+}
+
+function renderLeadsTable(dateStr){
+  var dayData = LEADS_DATA[dateStr] || {};
+  var html = '';
+  var agents = Object.keys(AGENTS).concat(Object.keys(SPECIAL));
+  
+  agents.forEach(function(name){
+    var d = dayData[name] || { assigned: 0, contacted: 0, confirma: 0, whatsapp: false };
+    var pct = d.assigned > 0 ? Math.round((d.contacted / d.assigned) * 100) : 0;
+    var wpIcon = d.whatsapp ? '✓' : '—';
+    var wpColor = d.whatsapp ? '#22d47a' : '#9898b8';
+    
+    html += '<tr style="border-bottom:1px solid var(--border)">' +
+      '<td style="padding:8px;font-weight:500">'+name+'</td>' +
+      '<td style="padding:8px;text-align:center"><input type="number" min="0" value="'+d.assigned+'" style="width:60px;padding:4px;font-size:12px;text-align:center" id="assigned_'+name+'" onchange="updateLeadsPreview()"></td>' +
+      '<td style="padding:8px;text-align:center"><input type="number" min="0" value="'+d.contacted+'" style="width:60px;padding:4px;font-size:12px;text-align:center" id="contacted_'+name+'" onchange="updateLeadsPreview()"></td>' +
+      '<td style="padding:8px;text-align:center;font-family:var(--mono);color:var(--accent);font-weight:500">'+pct+'%</td>' +
+      '<td style="padding:8px;text-align:center"><input type="number" min="0" value="'+d.confirma+'" style="width:50px;padding:4px;font-size:12px;text-align:center" id="confirma_'+name+'"></td>' +
+      '<td style="padding:8px;text-align:center"><input type="checkbox" '+( d.whatsapp ? 'checked' : '')+' id="whatsapp_'+name+'" style="cursor:pointer;width:16px;height:16px"><span style="color:'+wpColor+';margin-left:4px">'+wpIcon+'</span></td>' +
+      '</tr>';
+  });
+  
+  document.getElementById('leadsTableBody').innerHTML = html;
+}
+
+function updateLeadsPreview(){
+  // Evento en vivo si lo necesitás, por ahora solo visual
+}
+
+function saveLeadsDay(){
+  var dateStr = document.getElementById('leadsDateInput').value;
+  if(!dateStr){ alert('Seleccioná una fecha'); return; }
+  
+  loadLeadsData();
+  if(!LEADS_DATA[dateStr]) LEADS_DATA[dateStr] = {};
+  
+  var agents = Object.keys(AGENTS).concat(Object.keys(SPECIAL));
+  agents.forEach(function(name){
+    var assigned = parseInt(document.getElementById('assigned_'+name).value) || 0;
+    var contacted = parseInt(document.getElementById('contacted_'+name).value) || 0;
+    var confirma = parseInt(document.getElementById('confirma_'+name).value) || 0;
+    var whatsapp = document.getElementById('whatsapp_'+name).checked;
+    
+    LEADS_DATA[dateStr][name] = { assigned, contacted, confirma, whatsapp };
+  });
+  
+  saveLeadsData();
+  recalculateAllScores();
+  toast('Datos de leads guardados para '+dateStr);
+}
+
+function exportLeadsCSV(){
+  var dateStr = document.getElementById('leadsDateInput').value;
+  var dayData = LEADS_DATA[dateStr] || {};
+  
+  var csv = 'Agente,Leads Asignados,Leads Contactados,% Contactación,Confirmaciones,WhatsApp\n';
+  var agents = Object.keys(AGENTS).concat(Object.keys(SPECIAL));
+  
+  agents.forEach(function(name){
+    var d = dayData[name] || { assigned: 0, contacted: 0, confirma: 0, whatsapp: false };
+    var pct = d.assigned > 0 ? (d.contacted / d.assigned * 100).toFixed(1) : 0;
+    csv += name+','+d.assigned+','+d.contacted+','+pct+'%,'+d.confirma+','+(d.whatsapp ? 'Sí' : 'No')+'\n';
+  });
+  
+  var link = document.createElement('a');
+  link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  link.download = 'leads_' + dateStr + '.csv';
+  link.click();
+}
+
+function getLeadsScore(agentName){
+  // Calcular puntaje de leads de todos los días del mes
+  var total_assigned = 0;
+  var total_contacted = 0;
+  
+  Object.keys(LEADS_DATA).forEach(function(dateStr){
+    var d = LEADS_DATA[dateStr][agentName] || { assigned: 0, contacted: 0 };
+    total_assigned += d.assigned;
+    total_contacted += d.contacted;
+  });
+  
+  if(total_assigned === 0) return 0;
+  var contactacionPct = (total_contacted / total_assigned);
+  return Math.round(contactacionPct * 35); // 35 pts para leads
+}
+
+function getConfirmacionesScore(agentName){
+  // Sumar confirmaciones sin error hasta 15 pts
+  var total_confirma = 0;
+  Object.keys(LEADS_DATA).forEach(function(dateStr){
+    var d = LEADS_DATA[dateStr][agentName] || { confirma: 0 };
+    total_confirma += d.confirma;
+  });
+  return Math.min(total_confirma * 3, 15); // Máx 15 pts, 3 pts por confirmación
+}
+
+function getWhatsappScore(agentName){
+  // Contar días con WhatsApp cerrado (máx 10 pts)
+  var daysWithWhatsapp = 0;
+  Object.keys(LEADS_DATA).forEach(function(dateStr){
+    var d = LEADS_DATA[dateStr][agentName];
+    if(d && d.whatsapp) daysWithWhatsapp++;
+  });
+  return Math.min(daysWithWhatsapp * 2, 10); // Máx 10 pts, 2 pts por día
+}
+
+function recalculateAllScores(){
+  // Recalcula todos los agentes con la nueva fórmula de puntos
+  Object.keys(AGENTS).forEach(function(name){
+    var d = AGENTS[name];
+    // Scores fijos (del CSV o existentes)
+    d.sc_pct = Math.round(d.pct * 0.25);  // 25 pts atención
+    d.sc_tmo = Math.round((1 - Math.min(d.tmo/180, 1)) * 20);  // 20 pts TMO (estimado)
+    d.sc_camp = CAMPAIGN_WINS[name] ? Math.min(CAMPAIGN_WINS[name] * 5, 20) : 0;  // 20 pts campañas
+    
+    // Scores variables (de LEADS_DATA)
+    var leadsScore = getLeadsScore(name);
+    var confirmaScore = getConfirmacionesScore(name);
+    var whatsappScore = getWhatsappScore(name);
+    
+    // Total = 25 + 20 + 20 + 35 (leads) + var(15) + var(10) = 125 máx
+    d.totalFull = d.sc_pct + d.sc_tmo + d.sc_camp + leadsScore + confirmaScore + whatsappScore;
+    d.totalFull = Math.min(d.totalFull, 100); // Cap a 100 para dashboard
+  });
+}
+
 // ============ INIT ============
 function init(){
   loadStorage();
+  loadLeadsData();
   computeScores();
   rerenderAll();
 }
