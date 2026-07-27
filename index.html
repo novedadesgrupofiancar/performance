@@ -352,7 +352,7 @@ tr.hl td{background:rgba(124,92,252,0.06);}
         <div class="dm-h" style="color:var(--yellow)">⭐ Importar Feedback — Piero (XLSX)</div>
         <div class="dm-desc">Archivo con formato <code style="font-family:var(--mono);font-size:11px;color:var(--yellow)">_Piero__Feedback.xlsx</code>. Hoja "Evaluacion", columnas: Resultados Ventas, Post ventas, Whatsapp/Redes, Actitud.</div>
         <label class="upload-area" style="border-color:rgba(245,200,66,0.3)">
-          <input type="file" accept=".xlsx,.xls" onchange="handleSpecialXLSX(event,'Piero Britos')">
+          <input type="file" accept=".xlsx,.xls" onchange="handleSpecialXLSX(event,'Piero Paganini')">
           <div class="upload-icon" style="color:var(--yellow)">↑</div>
           <div class="upload-text" style="color:var(--yellow)">Click o arrastrá el XLSX de Piero</div>
           <div class="upload-hint">_Piero__Feedback.xlsx</div>
@@ -363,7 +363,7 @@ tr.hl td{background:rgba(124,92,252,0.06);}
         <div class="dm-h" style="color:var(--yellow)">⭐ Importar Feedback — Shoanna (XLSX)</div>
         <div class="dm-desc">Archivo con formato <code style="font-family:var(--mono);font-size:11px;color:var(--yellow)">_Shoanna__Feedback.xlsx</code>. Hoja "Evaluacion", columnas: Resultados Ventas, Post ventas, Tareas de calidad+redes, Actitud.</div>
         <label class="upload-area" style="border-color:rgba(245,200,66,0.3)">
-          <input type="file" accept=".xlsx,.xls" onchange="handleSpecialXLSX(event,'Shoanna Olveira')">
+          <input type="file" accept=".xlsx,.xls" onchange="handleSpecialXLSX(event,'Shoanna Silveira')">
           <div class="upload-icon" style="color:var(--yellow)">↑</div>
           <div class="upload-text" style="color:var(--yellow)">Click o arrastrá el XLSX de Shoanna</div>
           <div class="upload-hint">_Shoanna__Feedback.xlsx</div>
@@ -681,10 +681,11 @@ function loadStorage(){
 }
 
 function migrateSpecialNames(){
-  var nameMap = {'Piero Paganini':'Piero Britos','Shoanna Silveira':'Shoanna Olveira'};
+  var nameMap = {'Piero Britos':'Piero Paganini','Shoanna Olveira':'Shoanna Silveira'};
   var changed = false;
   Object.keys(nameMap).forEach(function(oldName){
     var newName = nameMap[oldName];
+    if(oldName === newName) return;
     if(SPECIAL[oldName]){ SPECIAL[newName]=SPECIAL[oldName]; delete SPECIAL[oldName]; changed=true; }
   });
   if(changed) saveStorage();
@@ -1452,8 +1453,8 @@ function handleSpecialXLSX(event, agentName){
   var file = event.target.files[0];
   if(!file) return;
   var statusId = agentName.split(' ')[0].toLowerCase()+'ImportStatus';
-  if(agentName === 'Shoanna Olveira') statusId = 'shoannaimportStatus';
-  if(agentName === 'Piero Britos') statusId = 'pieroImportStatus';
+  if(agentName === 'Shoanna Silveira') statusId = 'shoannaimportStatus';
+  if(agentName === 'Piero Paganini') statusId = 'pieroImportStatus';
 
   if(typeof XLSX === 'undefined'){
     alert('La librería XLSX aún se está cargando. Intentá nuevamente en un momento.');
