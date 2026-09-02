@@ -692,31 +692,37 @@ function migrateSpecialNames(){
 }
 
 // ============ SCORING - REGULAR AGENTS ============
-// Weights: % llamadas atendidas 30%, Tasks 20%, Campañas 25%, TMO 25%
-// Tasks: scored 0-20 (provided by quality team), scaled to 0-20 for the 20% weight
-// Campaign: based on ranking (1st=25, 2nd=20, 3rd=15, 4th=5, 5th+=0)
-// % Atendidas: ranked 1st-5th (30,22.5,15,7.5,0)
-// TMO: 25*(150/tmo), capped at 25
+// Escala (total 100): % atendidas 20, TMO 20, Campañas 20, Leads 25, Ownership/Tareas 15
+// Campañas: por tramos absolutos (10+→20, 7→16, 5→12, 3→8, 1→4). Natasha: 20 fijos (recepción).
+// Leads: (contactados/asignados) × 25, desde el panel de Leads Diarios
+// % Atendidas: por tramos de cumplimiento. TMO: 20×165/tmo, tope 20
 
 function getCampaignPts(wins){
-  // Tramos absolutos: cumplir, no superar a otros
-  if(wins >= 10) return 25;
-  if(wins >= 7)  return 20;
-  if(wins >= 5)  return 15;
-  if(wins >= 3)  return 10;
-  if(wins >= 1)  return 5;
+  // Tramos absolutos: cumplir, no superar a otros. Máximo 20 pts.
+  if(wins >= 10) return 20;
+  if(wins >= 7)  return 16;
+  if(wins >= 5)  return 12;
+  if(wins >= 3)  return 8;
+  if(wins >= 1)  return 4;
   return 0;
 }
 function computeCampaignRanking(){
   var names = Object.keys(AGENTS);
-  // El rank lo mantenemos solo para mostrar posicion, pero los puntos van por tramos
-  var sorted = names.slice().sort(function(a,b){
+  // Natasha no compite en campañas: recibe 20 pts fijos (tareas de recepción)
+  // y queda fuera del ranking de campañas.
+  var enRanking = names.filter(function(n){ return n !== 'Natasha Piriz'; });
+  var sorted = enRanking.slice().sort(function(a,b){
     return (CAMPAIGN_WINS[b]||0) - (CAMPAIGN_WINS[a]||0);
   });
   sorted.forEach(function(n,i){
     AGENTS[n].campRank = i+1;
     AGENTS[n].sc_camp = getCampaignPts(CAMPAIGN_WINS[n]||0);
   });
+  // Natasha: puntos fijos, sin posición en el ranking
+  if(AGENTS['Natasha Piriz']){
+    AGENTS['Natasha Piriz'].sc_camp = 20;
+    AGENTS['Natasha Piriz'].campRank = null;
+  }
 }
 
 function computeScores(){
@@ -729,14 +735,14 @@ function computeScores(){
   names.forEach(function(n){
     var p = AGENTS[n].pct;
     var sc;
-    if(p >= 90)      sc = 30;
-    else if(p >= 85) sc = 25;
-    else if(p >= 80) sc = 20;
-    else if(p >= 75) sc = 15;
-    else if(p >= 70) sc = 10;
-    else if(p >= 65) sc = 7;
-    else if(p >= 60) sc = 5;
-    else if(p >= 50) sc = 3;
+    if(p >= 90)      sc = 20;
+    else if(p >= 85) sc = 17;
+    else if(p >= 80) sc = 14;
+    else if(p >= 75) sc = 11;
+    else if(p >= 70) sc = 8;
+    else if(p >= 65) sc = 6;
+    else if(p >= 60) sc = 4;
+    else if(p >= 50) sc = 2;
     else if(p >  0)  sc = 1;
     else             sc = 0;
     AGENTS[n].sc_pct = sc;
@@ -745,15 +751,17 @@ function computeScores(){
   // Sort overall by total desc for main ranking
   names.forEach(function(name){
     var d = AGENTS[name];
-    // TMO score (25%)
-    d.sc_tmo = d.tmo > 0 ? Math.min(+(25 * 165 / d.tmo).toFixed(1), 25) : 0;
-    // Task/Ownership score (20%) - manual, from TASK_SCORES
-    d.sc_tasks = Math.min(TASK_SCORES[name] || 0, 20);
+    // TMO score (máx 20): 20 * 165/tmo, tope 20
+    d.sc_tmo = d.tmo > 0 ? Math.min(+(20 * 165 / d.tmo).toFixed(1), 20) : 0;
+    // Tareas/Ownership (máx 15) - manual, desde TASK_SCORES
+    d.sc_tasks = Math.min(TASK_SCORES[name] || 0, 15);
+    // Leads (máx 25) - desde el panel de Leads Diarios
+    d.sc_leads = getLeadsScore(name);
     // TMO display
     var s = Math.round(d.tmo);
     d.tmod = Math.floor(s/60) + ':' + (s%60+'').padStart(2,'0');
-    // Total base (without tasks)
-    d.total = +(d.sc_pct + d.sc_tmo + d.sc_camp).toFixed(1);
+    // Total: %Atend(20) + TMO(20) + Campañas(20) + Leads(25) + Tareas(15) = 100
+    d.total = +(d.sc_pct + d.sc_tmo + d.sc_camp + d.sc_leads).toFixed(1);
     d.totalFull = Math.min(+(d.total + d.sc_tasks).toFixed(1), 100);
   });
 
@@ -894,13 +902,14 @@ function buildTable(agents){
       '<td><div class="aname">'+name+'</div><div class="aext">'+d.tasks+'</div></td>' +
       '<td class="barcell"><div class="mval" style="color:'+pc(d.pct)+'">'+d.pct.toFixed(1)+'%</div>'+pctBar+'</td>' +
       '<td class="barcell"><div class="mval" style="color:'+tc(d.tmo)+'">'+d.tmod+'</div>'+tBar+'</td>' +
-      '<td style="text-align:right"><div style="font-family:var(--mono);font-size:13px">'+campWins+' 🏆</div><div style="font-size:10px;color:var(--muted)">#'+d.campRank+'</div></td>' +
+      '<td style="text-align:right"><div style="font-family:var(--mono);font-size:13px">'+(d.campRank===null?'—':campWins+' 🏆')+'</div><div style="font-size:10px;color:var(--muted)">'+(d.campRank===null?'Recepción':'#'+d.campRank)+'</div></td>' +
       '<td style="text-align:right">' +
         '<div class="score-wrap">' +
           '<div class="pills">' +
             '<div class="pill">Atend.<b style="margin-left:3px">'+d.sc_pct+'</b></div>' +
             '<div class="pill">TMO <b>'+d.sc_tmo+'</b></div>' +
             '<div class="pill">Camp. <b>'+d.sc_camp+'</b></div>' +
+            '<div class="pill">Leads <b>'+(d.sc_leads||0)+'</b></div>' +
             '<div class="pill task-pill '+(hasTasks?'task-set':'')+'" onclick="quickEditTask(\''+name+'\')">Own. <b>'+(hasTasks?'+'+tasks:'+?')+'</b></div>' +
           '</div>' +
           '<div class="scircle" style="border-color:'+sc(total)+';color:'+sc(total)+'">' +
@@ -915,7 +924,7 @@ function buildTable(agents){
 
 // ============ CAMPAIGN RANKING UI ============
 function buildCampaignInputs(){
-  var names = Object.keys(AGENTS);
+  var names = Object.keys(AGENTS).filter(function(n){ return n !== 'Natasha Piriz'; });
   var html = '';
   names.forEach(function(n){
     var wins = CAMPAIGN_WINS[n] || 0;
@@ -941,7 +950,7 @@ function updateCampaignRanking(){
 }
 
 function renderCampaignRankTable(){
-  var names = Object.keys(AGENTS);
+  var names = Object.keys(AGENTS).filter(function(n){ return n !== 'Natasha Piriz'; });
   if(!names.length){ document.getElementById('campaignRankDisplay').innerHTML=''; return; }
   var sorted = names.slice().sort(function(a,b){
     return (CAMPAIGN_WINS[b]||0) - (CAMPAIGN_WINS[a]||0);
@@ -957,6 +966,7 @@ function renderCampaignRankTable(){
       '<td style="text-align:right"><span style="font-family:var(--mono);color:'+sc(pts*4)+'">'+pts+' pts</span></td></tr>';
   });
   html += '</tbody></table>';
+  html += '<div style="margin-top:8px;font-size:11px;color:var(--muted);font-family:var(--mono)">Natasha Piriz: fuera del ranking · 20 pts fijos por tareas de recepción</div>';
   document.getElementById('campaignRankDisplay').innerHTML = html;
 }
 
@@ -1054,7 +1064,7 @@ function buildDetailContent(name){
     {key:'pct',  label:'% Atendidas',   val:d.pct.toFixed(1)+'%',  sub:'obj: 90% (click para editar)', color:pc(d.pct), editable:true},
     {key:'tmo',  label:'TMO',           val:d.tmod,                 sub:'obj: 2:45 (click para editar)',color:tc(d.tmo), editable:true},
     {key:null,   label:'Ranking llamadas', val:'#'+d.pctRank,       sub:'por % atendidas',              color:'var(--blue)'},
-    {key:null,   label:'Rank. campañas',  val:'#'+d.campRank,       sub:(CAMPAIGN_WINS[name]||0)+' ganadas',color:'var(--yellow)'}
+    {key:null,   label:'Rank. campañas',  val:(d.campRank===null?'Recepción':'#'+d.campRank),       sub:(d.campRank===null?'20 pts fijos':(CAMPAIGN_WINS[name]||0)+' ganadas'),color:'var(--yellow)'}
   ];
   document.getElementById('dkpis').innerHTML = kpis.map(function(k){
     var cls = k.editable ? 'dkpi editable' : 'dkpi';
@@ -1077,10 +1087,11 @@ function buildDetailContent(name){
       '<div class="gauge-lbl" style="color:'+color+'">'+sl(total)+'</div>'+
     '</div>'+
     '<div class="sbars">'+
-      sbarRow('% Atendidas (30%)', d.sc_pct, 30, pc(d.pct))+
-      sbarRow('TMO (25%)', d.sc_tmo, 25, tc(d.tmo))+
-      sbarRow('Campañas (25%)', d.sc_camp, 25, 'var(--yellow)')+
-      sbarRow('Ownership (20%)', tasks, 20, 'var(--accent)')+
+      sbarRow('% Atendidas (20)', d.sc_pct, 20, pc(d.pct))+
+      sbarRow('TMO (20)', d.sc_tmo, 20, tc(d.tmo))+
+      sbarRow('Campañas (20)', d.sc_camp, 20, 'var(--yellow)')+
+      sbarRow('Leads (25)', d.sc_leads||0, 25, 'var(--green)')+
+      sbarRow('Ownership (15)', tasks, 15, 'var(--accent)')+
     '</div>';
 
   document.getElementById('dnote').innerHTML = generateNote(name, d);
@@ -1107,7 +1118,7 @@ function buildDetailContent(name){
   document.getElementById('tabOwnership').innerHTML =
     '<div style="background:var(--surface2);border:1px solid var(--border);padding:20px">'+
     '<div class="sec-title" style="font-size:10px;margin-bottom:12px">Ownership & Ejecución</div>'+
-    '<p style="font-size:12px;color:var(--text2);margin-bottom:16px;line-height:1.6">El puntaje de <strong style="color:var(--accent)">Ownership (20%)</strong> es asignado por el equipo de calidad en base a la ejecución de tareas asignadas: <em>'+d.tasks+'</em>.</p>'+
+    '<p style="font-size:12px;color:var(--text2);margin-bottom:16px;line-height:1.6">El puntaje de <strong style="color:var(--accent)">Ownership (15)</strong> es asignado por el equipo de calidad en base a la ejecución de tareas asignadas: <em>'+d.tasks+'</em>.</p>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'+
     '<div style="background:var(--bg);border:1px solid var(--border);padding:16px">'+
     '<div class="task-lbl">Puntaje actual</div>'+
@@ -1143,8 +1154,10 @@ function generateNote(name, d){
   if(d.tmo <= 165) strengths.push('TMO óptimo');
   else if(d.tmo <= 195) issues.push('TMO ligeramente sobre objetivo (2:45)');
   else issues.push('TMO muy elevado');
-  if(d.campRank <= 2) strengths.push('top del equipo en campañas');
-  else if(d.campRank >= 5) issues.push('bajo en campañas');
+  if(d.campRank !== null){
+    if(d.campRank <= 2) strengths.push('top del equipo en campañas');
+    else if(d.campRank >= 5) issues.push('bajo en campañas');
+  }
   var txt = '';
   if(strengths.length) txt += '<strong>Fortalezas:</strong> ' + strengths.join(', ') + '.';
   if(issues.length) txt += (txt?' <br>':'') + '<strong>A mejorar:</strong> ' + issues.join(', ') + '.';
@@ -1228,8 +1241,8 @@ function renderTotal(name){
       '<div class="gauge-max">/100</div>'+
     '</div>'+
     '<div>'+
-      '<div style="font-size:12px;color:var(--text2)">Base (Atend+TMO+Camp): <span style="font-family:var(--mono);color:var(--text)">'+d.total.toFixed(1)+'/80</span></div>'+
-      '<div style="font-size:12px;color:var(--text2);margin-top:4px">Ownership: <span style="font-family:var(--mono);color:var(--accent)">+'+d.sc_tasks+'/20</span></div>'+
+      '<div style="font-size:12px;color:var(--text2)">Base (Atend+TMO+Camp+Leads): <span style="font-family:var(--mono);color:var(--text)">'+d.total.toFixed(1)+'/85</span></div>'+
+      '<div style="font-size:12px;color:var(--text2);margin-top:4px">Ownership: <span style="font-family:var(--mono);color:var(--accent)">+'+d.sc_tasks+'/15</span></div>'+
       '<div style="margin-top:8px;font-family:var(--mono);font-size:11px;padding:4px 10px;border:1px solid '+color+';color:'+color+';display:inline-block">'+sl(total)+'</div>'+
     '</div>';
 }
@@ -1628,10 +1641,11 @@ function buildAgentContext(val){
     ctx += '% Llamadas atendidas: '+d.pct.toFixed(1)+'% (obj: 90%)\n';
     ctx += 'TMO: '+d.tmod+' (obj: 2:45)\n';
     ctx += 'Ranking general: #'+d.rank+' de '+Object.keys(AGENTS).length+'\n';
-    ctx += 'Campañas ganadas: '+(CAMPAIGN_WINS[name]||0)+' (rank #'+d.campRank+')\n';
-    ctx += 'Ownership/Tareas: '+tasks+'/20 pts\n';
+    ctx += 'Campañas ganadas: '+(CAMPAIGN_WINS[name]||0)+(d.campRank===null?' (recepción, 20 pts fijos)':' (rank #'+d.campRank+')')+'\n';
+    ctx += 'Ownership/Tareas: '+tasks+'/15 pts\n';
+    ctx += 'Leads gestionados: '+(d.sc_leads||0)+'/25 pts\n';
     ctx += 'Puntaje total: '+d.totalFull.toFixed(1)+'/100\n';
-    ctx += 'Desglose: Atención='+d.sc_pct+' | TMO='+d.sc_tmo+' | Campañas='+d.sc_camp+' | Ownership='+tasks+'\n';
+    ctx += 'Desglose: Atención='+d.sc_pct+' | TMO='+d.sc_tmo+' | Campañas='+d.sc_camp+' | Leads='+(d.sc_leads||0)+' | Ownership='+tasks+'\n';
     ctx += 'Tareas asignadas: '+d.tasks+'\n';
   } else {
     var sp = SPECIAL[name]; if(!sp) return null;
@@ -1899,7 +1913,9 @@ function saveLeadsDay(){
   });
   
   saveLeadsData();
-  recalculateAllScores();
+  computeScores();
+  saveStorage();
+  rerenderAll();
   toast('Datos de leads guardados para '+dateStr);
 }
 
@@ -1923,59 +1939,19 @@ function exportLeadsCSV(){
 }
 
 function getLeadsScore(agentName){
-  // Calcular puntaje de leads de todos los días del mes
+  // Puntaje de leads del mes: (contactados / asignados) × 25
   var total_assigned = 0;
   var total_contacted = 0;
-  
+
   Object.keys(LEADS_DATA).forEach(function(dateStr){
     var d = LEADS_DATA[dateStr][agentName] || { assigned: 0, contacted: 0 };
     total_assigned += d.assigned;
     total_contacted += d.contacted;
   });
-  
+
   if(total_assigned === 0) return 0;
   var contactacionPct = (total_contacted / total_assigned);
-  return Math.round(contactacionPct * 35); // 35 pts para leads
-}
-
-function getConfirmacionesScore(agentName){
-  // Sumar confirmaciones sin error hasta 15 pts
-  var total_confirma = 0;
-  Object.keys(LEADS_DATA).forEach(function(dateStr){
-    var d = LEADS_DATA[dateStr][agentName] || { confirma: 0 };
-    total_confirma += d.confirma;
-  });
-  return Math.min(total_confirma * 3, 15); // Máx 15 pts, 3 pts por confirmación
-}
-
-function getWhatsappScore(agentName){
-  // Contar días con WhatsApp cerrado (máx 10 pts)
-  var daysWithWhatsapp = 0;
-  Object.keys(LEADS_DATA).forEach(function(dateStr){
-    var d = LEADS_DATA[dateStr][agentName];
-    if(d && d.whatsapp) daysWithWhatsapp++;
-  });
-  return Math.min(daysWithWhatsapp * 2, 10); // Máx 10 pts, 2 pts por día
-}
-
-function recalculateAllScores(){
-  // Recalcula todos los agentes con la nueva fórmula de puntos
-  Object.keys(AGENTS).forEach(function(name){
-    var d = AGENTS[name];
-    // Scores fijos (del CSV o existentes)
-    d.sc_pct = Math.round(d.pct * 0.25);  // 25 pts atención
-    d.sc_tmo = Math.round((1 - Math.min(d.tmo/180, 1)) * 20);  // 20 pts TMO (estimado)
-    d.sc_camp = CAMPAIGN_WINS[name] ? Math.min(CAMPAIGN_WINS[name] * 5, 20) : 0;  // 20 pts campañas
-    
-    // Scores variables (de LEADS_DATA)
-    var leadsScore = getLeadsScore(name);
-    var confirmaScore = getConfirmacionesScore(name);
-    var whatsappScore = getWhatsappScore(name);
-    
-    // Total = 25 + 20 + 20 + 35 (leads) + var(15) + var(10) = 125 máx
-    d.totalFull = d.sc_pct + d.sc_tmo + d.sc_camp + leadsScore + confirmaScore + whatsappScore;
-    d.totalFull = Math.min(d.totalFull, 100); // Cap a 100 para dashboard
-  });
+  return Math.round(contactacionPct * 25); // 25 pts para leads
 }
 
 // ============ INIT ============
