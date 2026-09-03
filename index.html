@@ -42,6 +42,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 .badge{font-family:var(--mono);font-size:11px;padding:6px 12px;border:1px solid var(--border2);color:var(--text2);background:var(--surface2);}
 .badge-yellow{color:var(--yellow);border-color:rgba(245,200,66,0.3);background:rgba(245,200,66,0.06);}
 .badge-action{cursor:pointer;color:var(--accent);border-color:rgba(124,92,252,0.3);background:rgba(124,92,252,0.08);transition:all 0.15s;}
+.admin-only{display:none;}
+body.is-admin .admin-only{display:inline-flex;}
 .badge-action:hover{background:rgba(124,92,252,0.15);}
 
 /* TOOLBAR */
@@ -295,11 +297,13 @@ tr.hl td{background:rgba(124,92,252,0.06);}
   <div class="header-right">
     <div class="badge" id="monthBadge">MAYO 2026</div>
     <div class="badge badge-yellow">OBJ ATENCIÓN: 90%</div>
-    <div class="badge badge-action" onclick="toggleDataManager()">⚙ Gestionar datos</div>
-    <div class="badge badge-action" onclick="openFeedbackModal()" style="color:#22d47a;border-color:rgba(34,212,122,0.3);background:rgba(34,212,122,0.08)">✦ Generar Feedback</div>
-    <div class="badge badge-action" onclick="openLeadsPanel()" style="color:#f5a623;border-color:rgba(245,166,35,0.3);background:rgba(245,166,35,0.08)" id="leadsBtn">📊 Leads Diarios</div>
-    <div class="badge badge-action" onclick="exportSnapshot()" style="color:#4d8eff;border-color:rgba(77,142,255,0.3);background:rgba(77,142,255,0.08)" id="exportBtn">📷 Exportar imagen</div>
-    <div class="badge badge-action" onclick="logout()">↪ Salir</div>
+    <div class="badge" id="syncTag" style="font-family:var(--mono);font-size:10px;letter-spacing:.5px">Modo local</div>
+    <div class="badge badge-action admin-only" onclick="toggleDataManager()">⚙ Gestionar datos</div>
+    <div class="badge badge-action admin-only" onclick="openFeedbackModal()" style="color:#22d47a;border-color:rgba(34,212,122,0.3);background:rgba(34,212,122,0.08)">✦ Generar Feedback</div>
+    <div class="badge badge-action" onclick="openLeadsPanel()" style="color:#f5a623;border-color:rgba(245,166,35,0.3);background:rgba(245,166,35,0.08)" id="leadsBtn">📊 Control de Leads</div>
+    <div class="badge badge-action admin-only" onclick="exportSnapshot()" style="color:#4d8eff;border-color:rgba(77,142,255,0.3);background:rgba(77,142,255,0.08)" id="exportBtn">📷 Exportar imagen</div>
+    <div class="badge badge-action admin-only" onclick="publicarFeedback()" style="color:#ff8a3d;border-color:rgba(255,138,61,0.35);background:rgba(255,138,61,0.10);font-weight:700" id="publishBtn">⬆ Publicar</div>
+    <div class="badge badge-action admin-only" onclick="logout()">↪ Salir</div>
   </div>
 </div>
 
@@ -550,33 +554,42 @@ tr.hl td{background:rgba(124,92,252,0.06);}
   <div class="modal" style="width:900px;max-width:96vw;max-height:90vh;overflow-y:auto;padding:28px 28px 24px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <div>
-        <div class="modal-title" style="font-size:18px">📊 Control de Leads Diarios</div>
+        <div class="modal-title" style="font-size:18px">📊 Control de Leads</div>
         <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;margin-top:3px" id="leadsDateLabel"></div>
       </div>
       <button class="modal-btn" onclick="closeLeadsPanel()" style="flex:none;width:auto;padding:6px 14px">✕</button>
     </div>
-    <div style="margin-bottom:16px">
-      <div class="task-lbl" style="margin-bottom:6px">Fecha (YYYY-MM-DD)</div>
-      <input type="date" id="leadsDateInput" style="width:100%;padding:8px 10px;font-size:13px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:var(--font);">
+    <div style="margin-bottom:8px">
+      <div class="task-lbl" style="margin-bottom:6px">Día a cargar / ver</div>
+      <input type="date" id="leadsDateInput" onchange="renderLeadsPanel(this.value)" style="width:100%;padding:8px 10px;font-size:13px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:var(--font);">
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.5">
+      Puntaje del día = (mismo día × 10 + vencido 1d × 1) ÷ entrantes. El puntaje de leads del ranking es el <b>promedio del mes × 2.5</b> (máx. 25).
     </div>
     <div style="margin-bottom:16px;overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead>
           <tr style="background:var(--surface2);border-bottom:1px solid var(--border)">
             <th style="padding:8px;text-align:left;font-weight:600">Agente</th>
-            <th style="padding:8px;text-align:center">Leads Asignados</th>
-            <th style="padding:8px;text-align:center">Leads Contactados</th>
-            <th style="padding:8px;text-align:center">% Contactación</th>
-            <th style="padding:8px;text-align:center">Confirmaciones sin error</th>
-            <th style="padding:8px;text-align:center">WhatsApp Cerrado</th>
+            <th style="padding:8px;text-align:center">Entrantes</th>
+            <th style="padding:8px;text-align:center">Mismo día</th>
+            <th style="padding:8px;text-align:center">Vencido 1d</th>
+            <th style="padding:8px;text-align:center">Score día</th>
+            <th style="padding:8px;text-align:center">Prom. mes</th>
+            <th style="padding:8px;text-align:center">Puntos /25</th>
           </tr>
         </thead>
         <tbody id="leadsTableBody"></tbody>
       </table>
     </div>
-    <div style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap">
+    <div id="leadsActions" style="margin-bottom:16px;display:none;gap:8px;flex-wrap:wrap">
       <button class="task-save" onclick="saveLeadsDay()" style="flex:1;min-width:120px">💾 Guardar día</button>
-      <button class="dbtn" onclick="exportLeadsCSV()" style="flex:1;min-width:120px">⬇ Exportar CSV</button>
+      <label class="dbtn" style="flex:1;min-width:160px;text-align:center;cursor:pointer">📥 Importar backup JSON
+        <input type="file" accept=".json" onchange="importLeadsJSON(event)" style="display:none">
+      </label>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.5">
+      El importador acepta los backups JSON del tablero de leads. Podés importar varios (se acumulan). Piero y Shoanna se ignoran.
     </div>
     <div id="leadsError" style="display:none;margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--red);text-align:center"></div>
   </div>
@@ -813,6 +826,73 @@ function getTotal(name){
   return d.totalFull;
 }
 function fmtSec(s){ var v=Math.round(s); return Math.floor(v/60)+':'+(v%60+'').padStart(2,'0'); }
+
+// ============ BACKEND (Google Apps Script) ============
+// PEGÁ ACÁ la URL de tu Apps Script del feedback (te paso el código y los pasos aparte).
+// Mientras esté vacía o sea el placeholder, el sistema funciona en modo local (este navegador).
+var API_URL = 'https://script.google.com/macros/s/AKfycbx6HSsBOg_BgBH0k1d_88_mzxFSrYGdwb5ef0in9R9jGnaWO6g7LrncaRU3NLSFRxoXdw/exec';
+var ADMIN_KEY = new URLSearchParams(location.search).get('admin') || '';
+var IS_ADMIN = ADMIN_KEY !== '';
+var SYNC_OK = false;
+
+function backendListo(){ return typeof API_URL === 'string' && API_URL.indexOf('http') === 0; }
+
+function setSyncTag(txt){
+  var e = document.getElementById('syncTag');
+  if(e) e.textContent = txt;
+}
+
+// Trae el reporte publicado y llena todo el estado
+async function cargarRemoto(){
+  if(!backendListo()){ setSyncTag('Modo local'); return false; }
+  try{
+    setSyncTag('Sincronizando…');
+    var r = await fetch(API_URL + '?t=' + Date.now());
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    var d = await r.json();
+    if(!d || !d.agents){ setSyncTag('Sin reporte publicado'); return false; }
+    AGENTS = d.agents;
+    if(d.special) SPECIAL = d.special;
+    if(d.tasks) TASK_SCORES = d.tasks;
+    if(d.camps) CAMPAIGN_WINS = d.camps;
+    if(d.config) CONFIG = d.config;
+    if(d.leads) LEADS_DATA = d.leads;
+    saveStorage(); saveLeadsData();
+    computeScores(); rerenderAll();
+    setSyncTag(d.publicado_el ? 'Actualizado ' + fmtFechaSync(d.publicado_el) : 'Actualizado');
+    SYNC_OK = true;
+    return true;
+  }catch(e){
+    console.warn('Sync GET', e);
+    setSyncTag('Sin conexión · copia local');
+    return false;
+  }
+}
+
+// Publica todo el estado del feedback para que lo vea el equipo (solo admin)
+async function publicarFeedback(){
+  if(!IS_ADMIN){ return; }
+  if(!backendListo()){ alert('Todavía no configuraste la URL del backend (API_URL) en el archivo.'); return; }
+  if(!confirm('Se va a publicar el feedback y lo va a ver todo el equipo. ¿Confirmás?')) return;
+  var payload = { token: ADMIN_KEY, data: {
+    agents: AGENTS, special: SPECIAL, tasks: TASK_SCORES,
+    camps: CAMPAIGN_WINS, config: CONFIG, leads: LEADS_DATA
+  }};
+  try{
+    setSyncTag('Publicando…');
+    var r = await fetch(API_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify(payload) });
+    var res = await r.json();
+    if(res.ok){ toast('Publicado · ya lo ve todo el equipo'); setSyncTag('Actualizado ' + fmtFechaSync(new Date().toISOString())); }
+    else { alert('No se pudo publicar: ' + (res.error || 'error desconocido')); setSyncTag('Error al publicar'); }
+  }catch(e){ alert('No se pudo publicar: ' + e.message); setSyncTag('Error al publicar'); }
+}
+
+function fmtFechaSync(iso){
+  try{
+    var d = new Date(iso);
+    return d.toLocaleDateString('es-UY',{day:'2-digit',month:'2-digit'}) + ' ' + d.toLocaleTimeString('es-UY',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){ return ''; }
+}
 
 // ============ LOGIN ============
 function doLogin(){
@@ -1179,9 +1259,10 @@ function saveTask(){
 }
 
 function quickEditTask(name){
+  if(typeof IS_ADMIN!=='undefined' && !IS_ADMIN) return;
   editTarget = {agent:name, field:'task'};
   document.getElementById('editModalTitle').textContent = 'Ownership — ' + name;
-  document.getElementById('editModalSub').textContent = 'Puntaje del 0 al 20 (peso 20% del total) — asignado por calidad';
+  document.getElementById('editModalSub').textContent = 'Puntaje del 0 al 15 (peso 15% del total) — asignado por calidad';
   document.getElementById('editModalInput').type = 'number';
   document.getElementById('editModalInput').value = TASK_SCORES[name] !== undefined ? TASK_SCORES[name] : '';
   document.getElementById('editModal').classList.add('open');
@@ -1189,6 +1270,7 @@ function quickEditTask(name){
 }
 
 function editKpi(name, field){
+  if(typeof IS_ADMIN!=='undefined' && !IS_ADMIN) return;
   editTarget = {agent:name, field:field};
   var labels = {pct:'% Atendidas', tmo:'TMO (m:ss o segundos)'};
   document.getElementById('editModalTitle').textContent = labels[field] + ' — ' + name;
@@ -1845,113 +1927,193 @@ function loadLeadsData(){
   try{
     var stored = localStorage.getItem('fiancar_leads');
     LEADS_DATA = stored ? JSON.parse(stored) : {};
-  }catch(e){
-    LEADS_DATA = {};
-  }
+  }catch(e){ LEADS_DATA = {}; }
+  // Normalizar estructura: LEADS_DATA[agente] = { records: { fecha: {...} } }
+  LEADS_AGENTS().forEach(function(n){
+    if(!LEADS_DATA[n]) LEADS_DATA[n] = { records: {} };
+    if(!LEADS_DATA[n].records) LEADS_DATA[n].records = {};
+  });
 }
 
 function saveLeadsData(){
   localStorage.setItem('fiancar_leads', JSON.stringify(LEADS_DATA));
 }
 
+// Agentes que participan de leads: todos los regulares MENOS los especiales (Piero/Shoanna quedan fuera)
+function LEADS_AGENTS(){
+  return Object.keys(AGENTS);
+}
+
+// Fórmula por día (igual al tablero de leads): (mismo_dia*10 + vencido_1d*1 + vencido_2d*0) / entrantes → 0-10
+function leadScoreOfDay(rec){
+  if(!rec || !rec.entrantes) return null;
+  var pts = rec.mismo_dia*10 + (rec.vencido_1d||0)*1 + (rec.vencido_2d||0)*0;
+  return pts / rec.entrantes;
+}
+
+// Promedio simple del mes (mide constancia) → 0-10
+function getLeadsAvg(name){
+  var recs = (LEADS_DATA[name] && LEADS_DATA[name].records) || {};
+  var scores = [];
+  Object.keys(recs).forEach(function(f){
+    var s = leadScoreOfDay(recs[f]);
+    if(s !== null) scores.push(s);
+  });
+  if(!scores.length) return null;
+  return scores.reduce(function(a,c){return a+c;},0) / scores.length;
+}
+
+// Puntaje de leads para el sistema (0-25): promedio_simple × 2.5
+function getLeadsScore(name){
+  var avg = getLeadsAvg(name);
+  if(avg === null) return 0;
+  return Math.round(avg * 2.5 * 10) / 10;
+}
+
 function openLeadsPanel(){
   loadLeadsData();
   var today = new Date().toISOString().split('T')[0];
-  document.getElementById('leadsDateInput').value = today;
-  document.getElementById('leadsDateLabel').textContent = today.toUpperCase();
-  renderLeadsTable(today);
+  var inp = document.getElementById('leadsDateInput');
+  if(inp) inp.value = today;
+  renderLeadsPanel(today);
   document.getElementById('leadsModal').classList.add('open');
 }
+function closeLeadsPanel(){ document.getElementById('leadsModal').classList.remove('open'); }
 
-function closeLeadsPanel(){
-  document.getElementById('leadsModal').classList.remove('open');
-}
-
-function renderLeadsTable(dateStr){
-  var dayData = LEADS_DATA[dateStr] || {};
+function renderLeadsPanel(dateStr){
+  var lbl = document.getElementById('leadsDateLabel');
+  if(lbl) lbl.textContent = (dateStr||'').toUpperCase();
+  var admin = (typeof IS_ADMIN !== 'undefined') && IS_ADMIN;
   var html = '';
-  var agents = Object.keys(AGENTS).concat(Object.keys(SPECIAL));
-  
-  agents.forEach(function(name){
-    var d = dayData[name] || { assigned: 0, contacted: 0, confirma: 0, whatsapp: false };
-    var pct = d.assigned > 0 ? Math.round((d.contacted / d.assigned) * 100) : 0;
-    var wpIcon = d.whatsapp ? '✓' : '—';
-    var wpColor = d.whatsapp ? '#22d47a' : '#9898b8';
-    
-    html += '<tr style="border-bottom:1px solid var(--border)">' +
-      '<td style="padding:8px;font-weight:500">'+name+'</td>' +
-      '<td style="padding:8px;text-align:center"><input type="number" min="0" value="'+d.assigned+'" style="width:60px;padding:4px;font-size:12px;text-align:center" id="assigned_'+name+'" onchange="updateLeadsPreview()"></td>' +
-      '<td style="padding:8px;text-align:center"><input type="number" min="0" value="'+d.contacted+'" style="width:60px;padding:4px;font-size:12px;text-align:center" id="contacted_'+name+'" onchange="updateLeadsPreview()"></td>' +
-      '<td style="padding:8px;text-align:center;font-family:var(--mono);color:var(--accent);font-weight:500">'+pct+'%</td>' +
-      '<td style="padding:8px;text-align:center"><input type="number" min="0" value="'+d.confirma+'" style="width:50px;padding:4px;font-size:12px;text-align:center" id="confirma_'+name+'"></td>' +
-      '<td style="padding:8px;text-align:center"><input type="checkbox" '+( d.whatsapp ? 'checked' : '')+' id="whatsapp_'+name+'" style="cursor:pointer;width:16px;height:16px"><span style="color:'+wpColor+';margin-left:4px">'+wpIcon+'</span></td>' +
-      '</tr>';
+  LEADS_AGENTS().forEach(function(name){
+    var rec = (LEADS_DATA[name] && LEADS_DATA[name].records && LEADS_DATA[name].records[dateStr]) || {entrantes:0,mismo_dia:0,vencido_1d:0,vencido_2d:0};
+    var sDay = leadScoreOfDay(rec);
+    var avg = getLeadsAvg(name);
+    var pts = getLeadsScore(name);
+    var sDayTxt = sDay===null ? '—' : sDay.toFixed(1);
+    var sDayCol = sDay===null ? 'var(--muted)' : (sDay>=7?'#22d47a':sDay>=4?'#f5c842':'#ff3a5c');
+    if(admin){
+      html += '<tr style="border-bottom:1px solid var(--border)">' +
+        '<td style="padding:8px;font-weight:500">'+name+'</td>' +
+        '<td style="padding:8px;text-align:center"><input type="number" min="0" value="'+(rec.entrantes||0)+'" style="width:64px;padding:4px;font-size:12px;text-align:center" id="lead_ent_'+name.replace(/[^a-z0-9]/gi,'_')+'" oninput="previewLeadRow(\''+name.replace(/[^a-z0-9]/gi,'_')+'\')"></td>' +
+        '<td style="padding:8px;text-align:center"><input type="number" min="0" value="'+(rec.mismo_dia||0)+'" style="width:64px;padding:4px;font-size:12px;text-align:center" id="lead_msd_'+name.replace(/[^a-z0-9]/gi,'_')+'" oninput="previewLeadRow(\''+name.replace(/[^a-z0-9]/gi,'_')+'\')"></td>' +
+        '<td style="padding:8px;text-align:center"><input type="number" min="0" value="'+(rec.vencido_1d||0)+'" style="width:56px;padding:4px;font-size:12px;text-align:center" id="lead_v1_'+name.replace(/[^a-z0-9]/gi,'_')+'" oninput="previewLeadRow(\''+name.replace(/[^a-z0-9]/gi,'_')+'\')"></td>' +
+        '<td style="padding:8px;text-align:center;font-family:var(--mono);color:'+sDayCol+'" id="lead_sday_'+name.replace(/[^a-z0-9]/gi,'_')+'">'+sDayTxt+'</td>' +
+        '<td style="padding:8px;text-align:center;font-family:var(--mono);color:var(--muted)">'+(avg===null?'—':avg.toFixed(1))+'</td>' +
+        '<td style="padding:8px;text-align:center;font-family:var(--mono);color:var(--accent);font-weight:700">'+pts+'</td>' +
+        '</tr>';
+    } else {
+      html += '<tr style="border-bottom:1px solid var(--border)">' +
+        '<td style="padding:8px;font-weight:500">'+name+'</td>' +
+        '<td style="padding:8px;text-align:center;font-family:var(--mono)">'+(rec.entrantes||0)+'</td>' +
+        '<td style="padding:8px;text-align:center;font-family:var(--mono)">'+(rec.mismo_dia||0)+'</td>' +
+        '<td style="padding:8px;text-align:center;font-family:var(--mono)">'+(rec.vencido_1d||0)+'</td>' +
+        '<td style="padding:8px;text-align:center;font-family:var(--mono);color:'+sDayCol+'">'+sDayTxt+'</td>' +
+        '<td style="padding:8px;text-align:center;font-family:var(--mono);color:var(--muted)">'+(avg===null?'—':avg.toFixed(1))+'</td>' +
+        '<td style="padding:8px;text-align:center;font-family:var(--mono);color:var(--accent);font-weight:700">'+pts+'</td>' +
+        '</tr>';
+    }
   });
-  
   document.getElementById('leadsTableBody').innerHTML = html;
+  // Botones admin
+  var actions = document.getElementById('leadsActions');
+  if(actions) actions.style.display = admin ? 'flex' : 'none';
 }
 
-function updateLeadsPreview(){
-  // Evento en vivo si lo necesitás, por ahora solo visual
+function previewLeadRow(safe){
+  var ent = parseInt((document.getElementById('lead_ent_'+safe)||{}).value)||0;
+  var msd = parseInt((document.getElementById('lead_msd_'+safe)||{}).value)||0;
+  var v1  = parseInt((document.getElementById('lead_v1_'+safe)||{}).value)||0;
+  var cell = document.getElementById('lead_sday_'+safe);
+  if(!cell) return;
+  if(!ent){ cell.textContent='—'; cell.style.color='var(--muted)'; return; }
+  var s = (msd*10 + v1*1) / ent;
+  cell.textContent = s.toFixed(1);
+  cell.style.color = s>=7?'#22d47a':s>=4?'#f5c842':'#ff3a5c';
 }
 
 function saveLeadsDay(){
   var dateStr = document.getElementById('leadsDateInput').value;
   if(!dateStr){ alert('Seleccioná una fecha'); return; }
-  
   loadLeadsData();
-  if(!LEADS_DATA[dateStr]) LEADS_DATA[dateStr] = {};
-  
-  var agents = Object.keys(AGENTS).concat(Object.keys(SPECIAL));
-  agents.forEach(function(name){
-    var assigned = parseInt(document.getElementById('assigned_'+name).value) || 0;
-    var contacted = parseInt(document.getElementById('contacted_'+name).value) || 0;
-    var confirma = parseInt(document.getElementById('confirma_'+name).value) || 0;
-    var whatsapp = document.getElementById('whatsapp_'+name).checked;
-    
-    LEADS_DATA[dateStr][name] = { assigned, contacted, confirma, whatsapp };
+  LEADS_AGENTS().forEach(function(name){
+    var safe = name.replace(/[^a-z0-9]/gi,'_');
+    var ent = parseInt((document.getElementById('lead_ent_'+safe)||{}).value)||0;
+    var msd = parseInt((document.getElementById('lead_msd_'+safe)||{}).value)||0;
+    var v1  = parseInt((document.getElementById('lead_v1_'+safe)||{}).value)||0;
+    if(!LEADS_DATA[name]) LEADS_DATA[name] = { records:{} };
+    if(!LEADS_DATA[name].records) LEADS_DATA[name].records = {};
+    if(ent===0 && msd===0 && v1===0){
+      delete LEADS_DATA[name].records[dateStr];
+    } else {
+      LEADS_DATA[name].records[dateStr] = { entrantes:ent, mismo_dia:msd, vencido_1d:v1, vencido_2d:0 };
+    }
   });
-  
   saveLeadsData();
   computeScores();
   saveStorage();
   rerenderAll();
-  toast('Datos de leads guardados para '+dateStr);
+  renderLeadsPanel(dateStr);
+  toast('Leads guardados para '+dateStr);
 }
 
-function exportLeadsCSV(){
-  var dateStr = document.getElementById('leadsDateInput').value;
-  var dayData = LEADS_DATA[dateStr] || {};
-  
-  var csv = 'Agente,Leads Asignados,Leads Contactados,% Contactación,Confirmaciones,WhatsApp\n';
-  var agents = Object.keys(AGENTS).concat(Object.keys(SPECIAL));
-  
-  agents.forEach(function(name){
-    var d = dayData[name] || { assigned: 0, contacted: 0, confirma: 0, whatsapp: false };
-    var pct = d.assigned > 0 ? (d.contacted / d.assigned * 100).toFixed(1) : 0;
-    csv += name+','+d.assigned+','+d.contacted+','+pct+'%,'+d.confirma+','+(d.whatsapp ? 'Sí' : 'No')+'\n';
+// Mapeo nombre de pila (backup) -> nombre completo (sistema)
+function leadNameMap(){
+  var map = {};
+  LEADS_AGENTS().forEach(function(full){
+    var first = full.split(' ')[0].normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+    map[first] = full;
   });
-  
-  var link = document.createElement('a');
-  link.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-  link.download = 'leads_' + dateStr + '.csv';
-  link.click();
+  return map;
 }
 
-function getLeadsScore(agentName){
-  // Puntaje de leads del mes: (contactados / asignados) × 25
-  var total_assigned = 0;
-  var total_contacted = 0;
-
-  Object.keys(LEADS_DATA).forEach(function(dateStr){
-    var d = LEADS_DATA[dateStr][agentName] || { assigned: 0, contacted: 0 };
-    total_assigned += d.assigned;
-    total_contacted += d.contacted;
-  });
-
-  if(total_assigned === 0) return 0;
-  var contactacionPct = (total_contacted / total_assigned);
-  return Math.round(contactacionPct * 25); // 25 pts para leads
+function importLeadsJSON(ev){
+  if(!IS_ADMIN) return;
+  var file = ev.target.files[0];
+  if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var bk = JSON.parse(e.target.result);
+      var src = bk.data || bk;
+      if(!src || typeof src !== 'object') throw new Error('Formato no reconocido');
+      var map = leadNameMap();
+      loadLeadsData();
+      var importados = 0, ignorados = [];
+      Object.keys(src).forEach(function(k){
+        var first = k.split(' ')[0].normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+        var full = map[first];
+        if(!full){ ignorados.push(k); return; }
+        var recs = (src[k] && src[k].records) || {};
+        if(!LEADS_DATA[full]) LEADS_DATA[full] = { records:{} };
+        if(!LEADS_DATA[full].records) LEADS_DATA[full].records = {};
+        Object.keys(recs).forEach(function(fecha){
+          var r = recs[fecha] || {};
+          LEADS_DATA[full].records[fecha] = {
+            entrantes: r.entrantes||0,
+            mismo_dia: r.mismo_dia||0,
+            vencido_1d: r.vencido_1d||0,
+            vencido_2d: r.vencido_2d||0
+          };
+          importados++;
+        });
+      });
+      saveLeadsData();
+      computeScores();
+      saveStorage();
+      rerenderAll();
+      var d = document.getElementById('leadsDateInput');
+      renderLeadsPanel(d ? d.value : new Date().toISOString().split('T')[0]);
+      var msg = 'Importados '+importados+' registros diarios';
+      if(ignorados.length) msg += ' · ignorados: '+ignorados.join(', ');
+      toast(msg);
+    }catch(err){
+      var eBox = document.getElementById('leadsError');
+      if(eBox){ eBox.textContent = 'Error al importar: '+err.message; eBox.style.display='block'; }
+    }
+    ev.target.value = '';
+  };
+  reader.readAsText(file);
 }
 
 // ============ INIT ============
@@ -1962,10 +2124,28 @@ function init(){
   rerenderAll();
 }
 
-if(localStorage.getItem('fiancar_auth') === 'ok'){
-  document.getElementById('loginOverlay').style.display = 'none';
-  init();
+function applyAdminVisibility(){
+  document.body.classList.toggle('is-admin', !!IS_ADMIN);
+  // Data manager (bloque) solo admin
+  var dm = document.getElementById('dataManager');
+  if(dm && !IS_ADMIN) dm.style.display = 'none';
+  // Etiqueta de rol
+  var badge = document.getElementById('roleBadge');
+  if(badge) badge.textContent = IS_ADMIN ? 'ADMIN' : 'EQUIPO';
 }
+
+async function boot(){
+  var ov = document.getElementById('loginOverlay');
+  if(ov) ov.style.display = 'none';       // sin login: el modo lo define ?admin=KEY
+  loadStorage();
+  loadLeadsData();
+  computeScores();
+  rerenderAll();
+  applyAdminVisibility();
+  await cargarRemoto();                    // trae lo publicado (si hay backend configurado)
+  applyAdminVisibility();
+}
+boot();
 </script>
 </body>
 </html>
