@@ -405,8 +405,12 @@ const EXCLUIR_ESTE_REPORTE = ['7998'];
 
 // SALIENTES — lista blanca: solo estos internos entran en el reporte de salientes.
 //   1135 Piero · 7994 Melanie · 7995 Sabrina · 7996 Natasha
-//   7997 Gianine · 7998 Shoanna · 8003 Alvaro · 8004 Damian
+//   7997 (Gianine, ex Isabel) · 7998 Shoanna · 8003 Alvaro · 8004 Damian
 const SALIENTES_AGENTES = ['1135','7994','7995','7996','7997','7998','8003','8004'];
+
+// RENOMBRES — interno : nombre a mostrar. Pisa lo que diga el CSV.
+// Sirve cuando cambia la persona de una extension y 3CX todavia tiene el nombre viejo.
+const RENOMBRAR = { '7997':'Gianine Pereda' };
 
 const EXCLUIDOS = EXCLUIR_SIEMPRE.concat(EXCLUIR_ESTE_REPORTE);
 function excluido(agente){ return EXCLUIDOS.includes(getExt(agente)); }
@@ -503,7 +507,11 @@ function parsePctStr(s){ if(typeof s==='number') return s; if(!s) return 0; retu
 function badgePct(p){ return p>=85?'g':p>=70?'a':'r'; }
 function colorPct(p){ return p>=85?'var(--green)':p>=70?'var(--amber)':'var(--red)'; }
 function colorTmo(t){ return t<=OBJETIVOS.tmo_seg?'var(--green)':t<=OBJETIVOS.tmo_seg*1.2?'var(--amber)':'var(--red)'; }
-function shortName(f){ return String(f).replace(/^\d+\s+/,'').trim(); }
+function shortName(f){
+  const e = getExt(f);
+  if(RENOMBRAR[e]) return RENOMBRAR[e];
+  return String(f).replace(/^\d+\s+/,'').trim();
+}
 function getExt(f){ const m=String(f).match(/^(\d+)/); return m?m[1]:''; }
 function shortQueue(q){ return String(q).replace(/^\d+\s*-?\s*/,'').trim(); }
 
@@ -654,9 +662,11 @@ function renderSalientes(){
       <div class="kpi-value">${fmtSec(t.tmo)}</div>
       <div class="kpi-sub">Sobre llamadas contestadas</div></div>`;
   document.getElementById('salMeta').textContent = s.agentes.length + ' agentes';
-  document.getElementById('salTable').innerHTML = s.agentes.map(a=>`
-    <tr data-f="${a.name.toLowerCase()} ${a.ext}">
-      <td style="padding-left:12px"><div class="ag-name">${a.name}</div><div class="ag-ext">Ext ${a.ext}</div></td>
+  document.getElementById('salTable').innerHTML = s.agentes.map(a=>{
+    const nom = RENOMBRAR[a.ext] || a.name;
+    return `
+    <tr data-f="${nom.toLowerCase()} ${a.ext}">
+      <td style="padding-left:12px"><div class="ag-name">${nom}</div><div class="ag-ext">Ext ${a.ext}</div></td>
       <td class="r">${nInt(a.total)}</td>
       <td class="r">${nInt(a.ans)}</td>
       <td class="r"><span class="badge ${badgePct(a.pct)}">${nPct(a.pct)}</span>
@@ -664,7 +674,7 @@ function renderSalientes(){
       <td class="r" style="color:var(--mute)">${nInt(a.un)}</td>
       <td class="r">${fmtSec(a.tmo)}</td>
       <td class="r" style="color:var(--mute);padding-right:12px">${fmtSec(a.talk)}</td>
-    </tr>`).join('');
+    </tr>`; }).join('');
 }
 
 // ===================== RENDER =====================
